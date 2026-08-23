@@ -13,33 +13,53 @@ import {
 } from './prompts.js';
 
 let genAI = null;
-let model = null;
-let visionModel = null;
+let currentApiKey = null;
+const MODEL_CANDIDATES = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
 
 /**
  * Initialize the Gemini API client.
  * @param {string} apiKey - Gemini API key
  */
 export function initGemini(apiKey) {
+  if (!apiKey || apiKey === 'your_key_here') return;
+  currentApiKey = apiKey;
   genAI = new GoogleGenerativeAI(apiKey);
-  // Use Gemini 2.5 Flash for planning (fast, free tier)
-  model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  // Same model handles vision (it's multimodal)
-  visionModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 }
 
 /**
  * Check if Gemini is initialized.
  */
 export function isGeminiReady() {
-  return model !== null;
+  return genAI !== null && currentApiKey !== null;
+}
+
+/**
+ * Helper to call Gemini with model fallback.
+ */
+async function callGeminiWithFallback(modelOptions, generateArgs) {
+  if (!genAI) throw new Error('Gemini not initialized. Set your API key first.');
+
+  let lastError = null;
+  for (const modelName of MODEL_CANDIDATES) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        ...modelOptions,
+      });
+      const result = await model.generateContent(generateArgs);
+      return result.response.text();
+    } catch (err) {
+      lastError = err;
+      console.warn(`⚠️ Model ${modelName} failed, trying fallback... (${err.message})`);
+    }
+  }
+  throw lastError || new Error('All Gemini model candidates failed');
 }
 
 /**
  * Parse JSON from LLM response, handling markdown code fences.
  */
 function parseJsonResponse(text) {
-  // Strip markdown code fences if present
   let cleaned = text.trim();
   if (cleaned.startsWith('```json')) {
     cleaned = cleaned.slice(7);
@@ -58,14 +78,16 @@ function parseJsonResponse(text) {
  * @returns {Promise<Object>} - Structured plan with steps
  */
 export async function planTask(userCommand) {
-  if (!model) throw new Error('Gemini not initialized. Set your API key first.');
+  const prompt = `${PLANNER_SYSTEM_PROMPT}\n\n## User Task\n${userCommand}\n\nProduce the JSON plan:`;
 
-  const chat = model.startChat({
-    systemInstruction: PLANNER_SYSTEM_PROMPT,
-  });
-
-  const result = await chat.sendMessage(userCommand);
-  const text = result.response.text();
+  const text = await callGeminiWithFallback(
+    {
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    },
+    prompt
+  );
 
   try {
     const plan = parseJsonResponse(text);
@@ -83,8 +105,6 @@ export async function planTask(userCommand) {
  * @returns {Promise<Object>} - Analysis result
  */
 export async function analyzeScreenshot(screenshotBuffer, context = {}) {
-  if (!visionModel) throw new Error('Gemini not initialized.');
-
   const prompt = VISION_ANALYSIS_PROMPT
     .replace('{url}', context.url || 'unknown')
     .replace('{title}', context.title || 'unknown')
@@ -98,13 +118,18 @@ export async function analyzeScreenshot(screenshotBuffer, context = {}) {
     },
   };
 
-  const result = await visionModel.generateContent([prompt, imagePart]);
-  const text = result.response.text();
+  const text = await callGeminiWithFallback(
+    {
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    },
+    [prompt, imagePart]
+  );
 
   try {
     return parseJsonResponse(text);
   } catch (err) {
-    // If JSON parsing fails, return raw text as extracted data
     return {
       pageDescription: text,
       extractedData: text,
@@ -132,8 +157,6 @@ export async function replan({
   currentTitle,
   screenshotBuffer,
 }) {
-  if (!visionModel) throw new Error('Gemini not initialized.');
-
   const prompt = REPLAN_PROMPT
     .replace('{originalTask}', originalTask)
     .replace('{originalPlan}', JSON.stringify(originalPlan, null, 2))
@@ -155,8 +178,14 @@ export async function replan({
     });
   }
 
-  const result = await visionModel.generateContent(parts);
-  const text = result.response.text();
+  const text = await callGeminiWithFallback(
+    {
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    },
+    parts
+  );
 
   try {
     return parseJsonResponse(text);
@@ -178,15 +207,12 @@ export async function replan({
  * @returns {Promise<string>} - Markdown summary
  */
 export async function summarizeTask(originalTask, executedSteps, extractedData) {
-  if (!model) throw new Error('Gemini not initialized.');
-
   const prompt = SUMMARY_PROMPT
     .replace('{originalTask}', originalTask)
     .replace('{executedSteps}', JSON.stringify(executedSteps, null, 2))
     .replace('{extractedData}', JSON.stringify(extractedData, null, 2));
 
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  return await callGeminiWithFallback({}, prompt);
 }
 
 /**
@@ -197,8 +223,6 @@ export async function summarizeTask(originalTask, executedSteps, extractedData) 
  * @returns {Promise<Object>} - Selector suggestions
  */
 export async function findSelector(elementDescription, screenshotBuffer, pageInfo = {}) {
-  if (!visionModel) throw new Error('Gemini not initialized.');
-
   const prompt = SMART_SELECTOR_PROMPT
     .replace('{elementDescription}', elementDescription)
     .replace('{url}', pageInfo.url || 'unknown')
@@ -215,8 +239,14 @@ export async function findSelector(elementDescription, screenshotBuffer, pageInf
     });
   }
 
-  const result = await visionModel.generateContent(parts);
-  const text = result.response.text();
+  const text = await callGeminiWithFallback(
+    {
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    },
+    parts
+  );
 
   try {
     return parseJsonResponse(text);
