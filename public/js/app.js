@@ -265,14 +265,6 @@ function updateStepStatus(taskId, stepId, status, description, result, screensho
     resultEl.textContent = error;
   }
 
-  if (screenshot && screenshotEl) {
-    const thumb = document.createElement('div');
-    thumb.className = 'screenshot-thumb';
-    thumb.innerHTML = `<img src="data:image/png;base64,${screenshot}" alt="Step ${stepId} screenshot">`;
-    thumb.addEventListener('click', () => openLightbox(`data:image/png;base64,${screenshot}`));
-    screenshotEl.appendChild(thumb);
-  }
-
   scrollToBottom();
 }
 

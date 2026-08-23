@@ -18,7 +18,6 @@ export async function executeAction(step, context = {}) {
     return {
       success: false,
       error: `Unknown action: ${step.action}`,
-      screenshot: null,
       result: null,
     };
   }
@@ -26,34 +25,15 @@ export async function executeAction(step, context = {}) {
   try {
     const result = await handler(step, context);
 
-    // Take a screenshot after every action (for the UI)
-    let screenshotBuffer = null;
-    try {
-      const filename = `${context.taskId}_step${step.id}_${Date.now()}.png`;
-      screenshotBuffer = await browser.screenshot(filename);
-      result.screenshotFile = filename;
-    } catch (err) {
-      console.warn('⚠️  Could not capture screenshot:', err.message);
-    }
-
     return {
       success: result.success !== false,
       result: result,
-      screenshot: screenshotBuffer,
-      screenshotFile: result.screenshotFile || null,
       error: result.error || null,
     };
   } catch (err) {
-    // Capture screenshot of the error state
-    let screenshotBuffer = null;
-    try {
-      screenshotBuffer = await browser.screenshot();
-    } catch { /* ignore screenshot errors */ }
-
     return {
       success: false,
       error: err.message,
-      screenshot: screenshotBuffer,
       result: null,
     };
   }

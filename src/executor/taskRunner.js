@@ -76,7 +76,7 @@ export async function runTask(command, options = {}) {
     broadcast({ type: 'browser_status', status: 'launching' });
     try {
       await browser.launch({
-        headless: options.headless ?? false,
+        headless: options.headless ?? true,
         profilePath: options.profilePath,
       });
       broadcast({ type: 'browser_status', status: 'open' });
@@ -116,19 +116,12 @@ export async function runTask(command, options = {}) {
 
     // Check if this is a sensitive action requiring approval
     if (step.sensitive || step.action === 'confirm') {
-      // Take a screenshot for the approval request
-      let approvalScreenshot = null;
-      try {
-        approvalScreenshot = await browser.screenshot();
-      } catch { /* ok */ }
-
       task.status = 'paused';
       broadcast({
         type: 'approval_required',
         taskId: plan.taskId,
         stepId: step.id,
         description: step.description,
-        screenshot: approvalScreenshot ? approvalScreenshot.toString('base64') : null,
       });
 
       // Wait for user approval
@@ -174,7 +167,6 @@ export async function runTask(command, options = {}) {
     if (actionResult.success) {
       step.status = 'completed';
       step.result = actionResult.result;
-      step.screenshot = actionResult.screenshotFile;
       task.completedSteps.push(step);
 
       // Collect extracted data
@@ -190,8 +182,6 @@ export async function runTask(command, options = {}) {
         taskId: plan.taskId,
         stepId: step.id,
         description: step.description,
-        screenshot: actionResult.screenshot ? actionResult.screenshot.toString('base64') : null,
-        screenshotFile: actionResult.screenshotFile,
         result: summarizeStepResult(actionResult.result),
       });
     } else {
@@ -204,7 +194,6 @@ export async function runTask(command, options = {}) {
         stepId: step.id,
         description: step.description,
         error: actionResult.error,
-        screenshot: actionResult.screenshot ? actionResult.screenshot.toString('base64') : null,
       });
 
       // === RE-PLANNING PHASE ===

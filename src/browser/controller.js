@@ -10,7 +10,7 @@ import { getProfilePath, ensureDataDirs } from './profile.js';
 
 let browserContext = null;
 let activePage = null;
-let isHeadless = false;
+let isHeadless = true;
 let onStatusChange = null; // Callback for status updates
 
 /**
@@ -33,7 +33,7 @@ export async function launch(options = {}) {
     return;
   }
 
-  isHeadless = options.headless ?? false;
+  isHeadless = options.headless ?? true;
   const profileDir = getProfilePath(options.profilePath || 'auto');
 
   console.log(`🚀 Launching browser (${isHeadless ? 'headless' : 'visible'})...`);
