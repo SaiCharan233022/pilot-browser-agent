@@ -14,7 +14,15 @@ import {
 
 let genAI = null;
 let currentApiKey = null;
-const MODEL_CANDIDATES = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+let workingModelName = null;
+const MODEL_CANDIDATES = [
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+  'gemini-2.5-flash'
+];
 
 /**
  * Initialize the Gemini API client.
@@ -23,6 +31,7 @@ const MODEL_CANDIDATES = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-fl
 export function initGemini(apiKey) {
   if (!apiKey || apiKey === 'your_key_here') return;
   currentApiKey = apiKey;
+  workingModelName = null;
   genAI = new GoogleGenerativeAI(apiKey);
 }
 
@@ -34,23 +43,29 @@ export function isGeminiReady() {
 }
 
 /**
- * Helper to call Gemini with model fallback.
+ * Helper to call Gemini with model fallback and working model caching.
  */
 async function callGeminiWithFallback(modelOptions, generateArgs) {
   if (!genAI) throw new Error('Gemini not initialized. Set your API key first.');
 
+  // If we already know which model works for this API key, try it first
+  const candidates = workingModelName
+    ? [workingModelName, ...MODEL_CANDIDATES.filter(m => m !== workingModelName)]
+    : MODEL_CANDIDATES;
+
   let lastError = null;
-  for (const modelName of MODEL_CANDIDATES) {
+  for (const modelName of candidates) {
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
         ...modelOptions,
       });
       const result = await model.generateContent(generateArgs);
+      workingModelName = modelName; // Cache the successful model
       return result.response.text();
     } catch (err) {
       lastError = err;
-      console.warn(`⚠️ Model ${modelName} failed, trying fallback... (${err.message})`);
+      console.warn(`⚠️ Model ${modelName} failed (${err.message}), trying fallback...`);
     }
   }
   throw lastError || new Error('All Gemini model candidates failed');
