@@ -25,11 +25,12 @@
 
 ### Level 2 — Computer & Media Assistant `[COMPLETED]`
 - [x] Web media playback (YouTube video search, direct playback, audio unmuting)
-- [x] Web app launching (Spotify, GitHub, Reddit, Amazon, etc.)
+- [x] Universal web & AI platform launcher (Gemini, Gamma AI, Perplexity, Claude, DeepSeek, HuggingFace, LeetCode, Canva, Figma, Notion, Wikipedia, etc.)
+- [x] Dynamic arbitrary URL / website resolver with automatic foreground elevation
 - [x] OS-level media control (Play / Pause / Stop / Next track / Prev track via Windows Virtual Media Keys)
 - [x] OS-level master volume control (Set volume %, volume up/down, mute, unmute via CoreAudio IAudioEndpointVolume API)
 - [x] Windows native application control (Launch installed apps like VS Code, Notepad, Spotify desktop, Calculator, Terminal, Chrome, Explorer, Settings)
-- [x] Process & window verification (Verifies running process in system process table before confirming)
+- [x] Process & window verification with WScript.Shell SendKeys desktop typing & foreground focus
 - [x] Windows native application termination (Close/Stop running desktop applications on command)
 
 ### Level 3 — Web Assistant `[COMPLETED]`
