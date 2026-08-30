@@ -243,12 +243,14 @@ export async function runTask(command, options = {}) {
 
   // === SUMMARIZATION PHASE ===
   let summary = '';
+  let openUrl = null;
   const systemActionSet = ['media_control', 'app_launch', 'app_close', 'open_and_play', 'desktop_focus', 'desktop_type', 'desktop_key'];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
   if (plan.steps.length === 1 && plan.steps[0].action === 'navigate' && task.completedSteps.length > 0) {
-    const targetUrl = plan.steps[0].url;
-    summary = `🌐 **Opened in your browser:** [${targetUrl}](${targetUrl})`;
+    openUrl = plan.steps[0].url;
+    const name = plan.steps[0].targetName || 'website';
+    summary = `Opened ${name} directly on your screen.`;
   } else if (isAllSystemActions && task.completedSteps.length > 0) {
     const lastStep = task.completedSteps[task.completedSteps.length - 1];
     if (lastStep.action === 'media_control') {
@@ -285,6 +287,7 @@ export async function runTask(command, options = {}) {
     type: 'task_complete',
     taskId: plan.taskId,
     summary,
+    openUrl,
     stepsCompleted: task.completedSteps.length,
     totalSteps: plan.steps.length,
     extractedData: task.extractedData,

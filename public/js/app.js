@@ -149,8 +149,19 @@ function handleServerMessage(msg) {
       renderApprovalRequest(msg);
       break;
 
+    case 'open_url':
+      if (msg.url) {
+        window.open(msg.url, '_blank');
+      }
+      break;
+
     case 'task_complete':
       removeStatusMessage();
+      if (msg.openUrl) {
+        try {
+          window.open(msg.openUrl, '_blank');
+        } catch {}
+      }
       renderTaskSummary(msg);
       loadTaskHistory();
       break;

@@ -177,13 +177,14 @@ function getFastPathPlan(rawCmd) {
     // Otherwise it is a Website / Web Service / AI Platform / Custom URL
     const targetUrl = resolveUrl(target);
     return {
-      summary: `Open ${target} (${targetUrl})`,
+      summary: `Open ${target}`,
       steps: [
         {
           id: 1,
           action: 'navigate',
+          targetName: target,
           url: targetUrl,
-          description: `Open ${target} in browser (${targetUrl})`,
+          description: `Open ${target} directly on screen`,
         },
       ],
     };
