@@ -43,6 +43,11 @@ async function main() {
     broadcast({ type: 'browser_status', status });
   });
 
+  // Pre-warm browser in background for zero-delay execution
+  import('./browser/controller.js').then(b => {
+    b.launch({ headless: process.env.HEADLESS === 'true' }).catch(() => {});
+  });
+
   httpServer.listen(PORT, () => {
     console.log('');
     console.log(`  🌐 Server running at: http://localhost:${PORT}`);

@@ -1,7 +1,7 @@
 /**
- * Browser Controller — High-Performance Playwright Automation Engine.
- * Supports visible & headless modes, full audio playback, smart selector fallbacks,
- * and reliable video/media interactions.
+ * Browser Controller — Ultra High-Speed Playwright Engine.
+ * Pre-warmed browser, instant selector resolution, zero artificial delays,
+ * and high-speed navigation.
  */
 
 import { chromium } from 'playwright';
@@ -11,7 +11,7 @@ import { getProfilePath, ensureDataDirs } from './profile.js';
 
 let browserContext = null;
 let activePage = null;
-let isHeadless = false; // Visible by default for full media/watch/listen support
+let isHeadless = false;
 let onStatusChange = null;
 
 /**
@@ -22,11 +22,7 @@ export function setStatusCallback(callback) {
 }
 
 /**
- * Launch the browser with the user's Chrome profile.
- * @param {Object} options
- * @param {boolean} options.headless - Run in headless mode
- * @param {string} options.profilePath - Chrome profile path config
- * @returns {Promise<void>}
+ * Launch or warm-start the browser with optimal speed flags.
  */
 export async function launch(options = {}) {
   if (browserContext) {
@@ -35,8 +31,6 @@ export async function launch(options = {}) {
 
   isHeadless = options.headless ?? false;
   const profileDir = getProfilePath(options.profilePath || 'auto');
-
-  console.log(`🚀 Launching browser (${isHeadless ? 'headless' : 'visible'})...`);
 
   try {
     browserContext = await chromium.launchPersistentContext(profileDir, {
@@ -48,7 +42,10 @@ export async function launch(options = {}) {
         '--disable-blink-features=AutomationControlled',
         '--disable-infobars',
         '--autoplay-policy=no-user-gesture-required',
-        '--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies,Translate,OptimizationHints',
       ],
       viewport: { width: 1366, height: 768 },
       ignoreDefaultArgs: ['--enable-automation', '--mute-audio'],
@@ -61,7 +58,6 @@ export async function launch(options = {}) {
       activePage = page;
     });
 
-    console.log('✅ Browser launched successfully');
     onStatusChange?.('open');
   } catch (err) {
     console.error('❌ Failed to launch browser:', err.message);
@@ -75,9 +71,7 @@ export async function launch(options = {}) {
 }
 
 /**
- * Navigate to a URL.
- * @param {string} url - Target URL
- * @returns {Promise<Object>} - Navigation result
+ * High-speed navigation.
  */
 export async function navigate(url) {
   ensurePage();
@@ -85,8 +79,7 @@ export async function navigate(url) {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
-    await activePage.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
-    await activePage.waitForTimeout(300);
+    await activePage.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
     return { success: true, url: activePage.url(), title: await activePage.title() };
   } catch (err) {
     return { success: false, error: err.message };
@@ -94,47 +87,25 @@ export async function navigate(url) {
 }
 
 /**
- * Smart resilient click with multi-tier fallback.
- * @param {string} selector - CSS selector or target description
- * @returns {Promise<Object>} - Click result
+ * Instant resilient click with multi-tier fast fallback.
  */
 export async function click(selector) {
   ensurePage();
 
-  // Tier 1: Direct CSS selector
+  // 1. Direct CSS locator
   try {
     const loc = activePage.locator(selector).first();
-    if (await loc.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await loc.click({ timeout: 4000 });
+    if (await loc.isVisible({ timeout: 800 }).catch(() => false)) {
+      await loc.click({ timeout: 1500 });
       await ensureMediaPlays();
       return { success: true, method: 'css', selector };
     }
-  } catch { /* proceed to fallbacks */ }
+  } catch { /* proceed */ }
 
-  // Tier 2: YouTube & Media specific common selectors
   const sLower = selector.toLowerCase();
-  if (sLower.includes('search') || sLower.includes('icon')) {
-    const searchSelectors = [
-      'button#search-icon-legacy',
-      'button[aria-label*="Search" i]',
-      '#search-button button',
-      'button.search-button',
-      'input[type="submit"]',
-      'button[type="submit"]',
-      '[aria-label*="Search" i]',
-    ];
-    for (const s of searchSelectors) {
-      try {
-        const loc = activePage.locator(s).first();
-        if (await loc.isVisible({ timeout: 500 }).catch(() => false)) {
-          await loc.click({ timeout: 3000 });
-          return { success: true, method: 'search-fallback', selector: s };
-        }
-      } catch { /* next */ }
-    }
-  }
 
-  if (sLower.includes('video') || sLower.includes('result') || sLower.includes('play') || sLower.includes('song')) {
+  // 2. Video / media results
+  if (sLower.includes('video') || sLower.includes('result') || sLower.includes('play') || sLower.includes('song') || sLower.includes('thumbnail')) {
     const videoSelectors = [
       'a#video-title',
       'ytd-video-renderer a#thumbnail',
@@ -142,68 +113,76 @@ export async function click(selector) {
       'ytd-rich-item-renderer a#video-title',
       'a[href*="/watch?v="]',
       'ytd-video-renderer h3 a',
-      '.ytd-video-renderer',
     ];
     for (const v of videoSelectors) {
       try {
         const loc = activePage.locator(v).first();
-        if (await loc.isVisible({ timeout: 800 }).catch(() => false)) {
-          await loc.click({ timeout: 3000 });
+        if (await loc.isVisible({ timeout: 400 }).catch(() => false)) {
+          await loc.click({ timeout: 1500 });
           await ensureMediaPlays();
-          return { success: true, method: 'video-fallback', selector: v };
+          return { success: true, method: 'video-fast-click', selector: v };
         }
       } catch { /* next */ }
     }
   }
 
-  // Tier 3: Extract text quotes and search by Role or Text
+  // 3. Search buttons
+  if (sLower.includes('search') || sLower.includes('icon')) {
+    const searchSelectors = [
+      'button#search-icon-legacy',
+      'button[aria-label*="Search" i]',
+      '#search-button button',
+      'button.search-button',
+      'input[type="submit"]',
+    ];
+    for (const s of searchSelectors) {
+      try {
+        const loc = activePage.locator(s).first();
+        if (await loc.isVisible({ timeout: 300 }).catch(() => false)) {
+          await loc.click({ timeout: 1200 });
+          return { success: true, method: 'search-fast-click', selector: s };
+        }
+      } catch { /* next */ }
+    }
+  }
+
+  // 4. Role / text matching
   const quoteMatch = selector.match(/['"]([^'"]+)['"]/);
   const cleanText = quoteMatch ? quoteMatch[1] : selector.replace(/^[a-z0-9#._-]+/i, '').trim() || selector;
 
   if (cleanText && cleanText.length > 1) {
     try {
       const link = activePage.getByRole('link', { name: cleanText, exact: false }).first();
-      if (await link.isVisible({ timeout: 1500 }).catch(() => false)) {
-        await link.click({ timeout: 3000 });
+      if (await link.isVisible({ timeout: 600 }).catch(() => false)) {
+        await link.click({ timeout: 1500 });
         await ensureMediaPlays();
         return { success: true, method: 'role-link', text: cleanText };
       }
     } catch { /* next */ }
 
     try {
-      const btn = activePage.getByRole('button', { name: cleanText, exact: false }).first();
-      if (await btn.isVisible({ timeout: 1500 }).catch(() => false)) {
-        await btn.click({ timeout: 3000 });
-        return { success: true, method: 'role-button', text: cleanText };
-      }
-    } catch { /* next */ }
-
-    try {
       const textEl = activePage.getByText(cleanText, { exact: false }).first();
-      if (await textEl.isVisible({ timeout: 1500 }).catch(() => false)) {
-        await textEl.click({ timeout: 3000 });
+      if (await textEl.isVisible({ timeout: 600 }).catch(() => false)) {
+        await textEl.click({ timeout: 1500 });
         await ensureMediaPlays();
         return { success: true, method: 'get-by-text', text: cleanText };
       }
     } catch { /* next */ }
   }
 
-  // Tier 4: Evaluate DOM click directly
+  // 5. In-DOM fast evaluation
   try {
     const clicked = await activePage.evaluate((targetText) => {
-      // Find first clickable link or video item
       const links = Array.from(document.querySelectorAll('a, button, [role="button"]'));
       const match = links.find(el => (el.innerText || el.getAttribute('aria-label') || '').toLowerCase().includes(targetText.toLowerCase()));
       if (match) {
         match.click();
         return true;
       }
-      if (links.length > 0 && (targetText.toLowerCase().includes('first') || targetText.toLowerCase().includes('video'))) {
-        const firstVideo = document.querySelector('a#video-title, ytd-video-renderer a, a[href*="watch"]');
-        if (firstVideo) {
-          firstVideo.click();
-          return true;
-        }
+      const firstVideo = document.querySelector('a#video-title, ytd-video-renderer a, a[href*="watch"]');
+      if (firstVideo) {
+        firstVideo.click();
+        return true;
       }
       return false;
     }, cleanText);
@@ -214,22 +193,16 @@ export async function click(selector) {
     }
   } catch { /* proceed */ }
 
-  return { success: false, error: `Could not interact with element: "${selector}"` };
+  return { success: false, error: `Could not click: "${selector}"` };
 }
 
 /**
- * Type text into an input field.
- * @param {string} selector - CSS selector or element description
- * @param {string} text - Text to type
- * @param {boolean} pressEnter - Whether to press Enter after typing
- * @returns {Promise<Object>} - Type result
+ * Instant typing.
  */
 export async function type(selector, text, pressEnter = true) {
   ensurePage();
 
   const isSearchField = selector.toLowerCase().includes('search') || selector.toLowerCase().includes('q') || selector.includes('input');
-
-  // Try standard selectors
   const candidateSelectors = [
     selector,
     'input[name="search_query"]',
@@ -237,51 +210,38 @@ export async function type(selector, text, pressEnter = true) {
     'input[name="q"]',
     'textarea[name="q"]',
     'input[type="text"]',
-    'input[type="search"]',
   ];
 
   for (const s of candidateSelectors) {
     try {
       const loc = activePage.locator(s).first();
-      if (await loc.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await loc.fill(text, { timeout: 3000 });
+      if (await loc.isVisible({ timeout: 500 }).catch(() => false)) {
+        await loc.fill(text, { timeout: 1500 });
         if (pressEnter || isSearchField) {
           await loc.press('Enter').catch(() => {});
-          await activePage.waitForTimeout(500);
         }
         return { success: true, method: 'locator-fill', selector: s };
       }
     } catch { /* next */ }
   }
 
-  // Placeholder / label fallbacks
   try {
     const el = activePage.getByPlaceholder(selector, { exact: false }).first();
-    await el.fill(text, { timeout: 3000 });
+    await el.fill(text, { timeout: 1500 });
     if (pressEnter || isSearchField) {
       await el.press('Enter').catch(() => {});
     }
     return { success: true, method: 'placeholder', selector };
-  } catch {
-    try {
-      const el = activePage.getByLabel(selector, { exact: false }).first();
-      await el.fill(text, { timeout: 3000 });
-      if (pressEnter || isSearchField) {
-        await el.press('Enter').catch(() => {});
-      }
-      return { success: true, method: 'label', selector };
-    } catch (err) {
-      return { success: false, error: `Could not type into input: ${selector}. ${err.message}` };
-    }
+  } catch (err) {
+    return { success: false, error: `Could not type into: ${selector}` };
   }
 }
 
 /**
- * Ensure media is unmuted and playing.
+ * Instant media unmuting and playback trigger.
  */
 async function ensureMediaPlays() {
   try {
-    await activePage.waitForTimeout(1000);
     await activePage.evaluate(() => {
       const videos = document.querySelectorAll('video');
       videos.forEach(v => {
@@ -294,9 +254,7 @@ async function ensureMediaPlays() {
 }
 
 /**
- * Take a screenshot of the current page.
- * @param {string} [savePath] - Optional path to save the screenshot
- * @returns {Promise<Buffer>} - Screenshot buffer
+ * Take a screenshot.
  */
 export async function screenshot(savePath) {
   ensurePage();
@@ -313,87 +271,64 @@ export async function screenshot(savePath) {
 }
 
 /**
- * Extract text content from the page or a specific element.
- * @param {string} [selector] - Optional CSS selector to extract from
- * @returns {Promise<string>} - Extracted text
+ * Extract text content.
  */
 export async function extractText(selector) {
   ensurePage();
   try {
     if (selector) {
-      return await activePage.textContent(selector, { timeout: 5000 });
+      return await activePage.textContent(selector, { timeout: 3000 });
     }
-    return await activePage.evaluate(() => {
-      const body = document.body;
-      if (!body) return '';
-      return body.innerText.substring(0, 10000);
-    });
+    return await activePage.evaluate(() => document.body ? document.body.innerText.substring(0, 10000) : '');
   } catch (err) {
-    return `Error extracting text: ${err.message}`;
+    return `Error: ${err.message}`;
   }
 }
 
 /**
- * Scroll the page.
- * @param {string} direction - 'up' or 'down'
- * @param {number|string} amount - Pixels or 'page'
- * @returns {Promise<Object>} - Scroll result
+ * Scroll.
  */
 export async function scroll(direction = 'down', amount = 'page') {
   ensurePage();
   const pixels = amount === 'page' ? 700 : parseInt(amount) || 700;
   const delta = direction === 'up' ? -pixels : pixels;
-
   await activePage.evaluate((d) => window.scrollBy(0, d), delta);
-  await activePage.waitForTimeout(300);
   return { success: true, direction, amount: pixels };
 }
 
 /**
- * Wait for an element to appear.
- * @param {string} selector - CSS selector
- * @param {number} timeout - Max wait time in ms
- * @returns {Promise<Object>} - Wait result
+ * Wait for element.
  */
-export async function waitForElement(selector, timeout = 8000) {
+export async function waitForElement(selector, timeout = 4000) {
   ensurePage();
   try {
     await activePage.waitForSelector(selector, { timeout, state: 'visible' });
     return { success: true, selector };
   } catch {
-    return { success: true, note: `Proceeded after waiting for ${selector}` };
+    return { success: true, note: `Proceeded after wait` };
   }
 }
 
 /**
- * Select an option from a dropdown.
- * @param {string} selector - CSS selector of the select element
- * @param {string} value - Option value or text to select
- * @returns {Promise<Object>} - Select result
+ * Select option.
  */
 export async function selectOption(selector, value) {
   ensurePage();
   try {
-    await activePage.selectOption(selector, { label: value }, { timeout: 5000 });
+    await activePage.selectOption(selector, { label: value }, { timeout: 3000 });
     return { success: true, selector, value };
-  } catch (err) {
-    try {
-      await activePage.selectOption(selector, value, { timeout: 5000 });
-      return { success: true, selector, value };
-    } catch {
-      return { success: false, error: `Could not select "${value}" in ${selector}: ${err.message}` };
-    }
+  } catch {
+    return { success: false, error: `Could not select "${value}"` };
   }
 }
 
 /**
- * Go back to the previous page.
- * @returns {Promise<Object>} - Navigation result
+ * Go back.
  */
 export async function goBack() {
   ensurePage();
   try {
-    await activePage.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 });
+    await activePage.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 });
     return { success: true, url: activePage.url() };
   } catch (err) {
     return { success: false, error: err.message };
@@ -401,8 +336,7 @@ export async function goBack() {
 }
 
 /**
- * Get information about the current page.
- * @returns {Promise<Object>} - Page info
+ * Page info.
  */
 export async function getPageInfo() {
   ensurePage();
@@ -413,7 +347,7 @@ export async function getPageInfo() {
 }
 
 /**
- * Close the browser.
+ * Close browser.
  */
 export async function close() {
   if (browserContext) {
@@ -429,7 +363,7 @@ export async function close() {
 }
 
 /**
- * Check if browser is currently running.
+ * Check if running.
  */
 export function isRunning() {
   return browserContext !== null;
@@ -437,7 +371,6 @@ export function isRunning() {
 
 /**
  * Toggle headless mode.
- * @param {boolean} headless
  */
 export function setHeadless(headless) {
   isHeadless = headless;
@@ -445,6 +378,6 @@ export function setHeadless(headless) {
 
 function ensurePage() {
   if (!activePage || !browserContext) {
-    throw new Error('Browser not launched. Call launch() first.');
+    throw new Error('Browser not ready.');
   }
 }
