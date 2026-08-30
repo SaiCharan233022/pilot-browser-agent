@@ -200,10 +200,10 @@ function getFastPathPlan(rawCmd) {
     }
   }
 
-  // 4. Close App
-  const closeMatch = cmd.match(/^close\s+([a-z0-9\s._-]+)$/i);
+  // 4. Close App / Close It / Close Active
+  const closeMatch = cmd.match(/^close(?:\s+([a-z0-9\s._-]+))?$/i);
   if (closeMatch) {
-    const appName = closeMatch[1].trim();
+    const appName = (closeMatch[1] || 'it').trim();
     return {
       summary: `Close ${appName}`,
       steps: [{

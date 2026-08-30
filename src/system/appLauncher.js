@@ -309,11 +309,14 @@ function resolveAppOrWebCommand(name) {
   return `powershell.exe -NoProfile -Command "Start-Process 'https://www.${sanitizedWord}.com' -ErrorAction SilentlyContinue; if (!$?) { Start-Process 'https://${sanitizedWord}.ai' }"`;
 }
 
+let lastLaunchedApp = null;
+
 /**
  * Launch an application or website visibly in foreground.
  */
 export async function launchApp(appName) {
   const normalized = (appName || '').trim().toLowerCase();
+  lastLaunchedApp = normalized;
 
   // 1. Direct custom registry match
   if (APP_REGISTRY[normalized]) {
@@ -378,19 +381,24 @@ export async function launchApp(appName) {
  */
 export async function closeApp(appName) {
   const normalized = (appName || '').trim().toLowerCase();
-  const entry = APP_REGISTRY[normalized];
-  const execNames = entry ? entry.execNames : [`${appName}.exe`, appName];
-  const patterns = entry ? entry.processPatterns : [appName];
 
-  let killed = false;
+  // If appName is 'it', 'the app', 'current', 'this', close the last launched app
+  if (['it', 'the app', 'current', 'active', 'this'].includes(normalized) || !normalized) {
+    if (lastLaunchedApp && lastLaunchedApp !== 'it') {
+      const target = lastLaunchedApp;
+      lastLaunchedApp = null;
+      return await closeApp(target);
+    }
+  }
+
+  const entry = APP_REGISTRY[normalized];
+  const execNames = entry ? entry.execNames : [`${normalized}.exe`, normalized];
+  const patterns = entry ? entry.processPatterns : [normalized];
 
   // 1. Try taskkill for each executable name
   for (const exe of execNames) {
     try {
-      const { stdout } = await execAsync(`taskkill /IM "${exe}" /T /F`);
-      if (stdout && stdout.includes('SUCCESS')) {
-        killed = true;
-      }
+      await execAsync(`taskkill /IM "${exe}" /T /F`);
     } catch {}
   }
 
@@ -398,9 +406,14 @@ export async function closeApp(appName) {
   for (const pat of patterns) {
     try {
       await execAsync(`powershell.exe -NoProfile -Command "Get-Process -Name '*${pat}*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"`);
-      killed = true;
     } catch {}
   }
+
+  // 3. Try closing via Window Title / Process Name search
+  try {
+    const psClose = `Get-Process | Where-Object { $_.MainWindowTitle.ToLower().Contains('${normalized}') -or $_.ProcessName.ToLower().Contains('${normalized}') } | Stop-Process -Force -ErrorAction SilentlyContinue`;
+    await execAsync(`powershell.exe -NoProfile -Command "${psClose}"`);
+  } catch {}
 
   return {
     success: true,
