@@ -52,10 +52,9 @@ export async function launch(options = {}) {
       ignoreDefaultArgs: ['--enable-automation', '--mute-audio'],
     });
   } catch (launchErr) {
-    console.warn('⚠️  Persistent launch had issue, attempting clean fallback launch...', launchErr.message);
     cleanProfileLocks(profileDir);
     try {
-      const fallbackDir = join(process.cwd(), 'data', 'temp-session');
+      const fallbackDir = join(process.cwd(), 'data', `session-${Date.now()}`);
       mkdirSync(fallbackDir, { recursive: true });
       browserContext = await chromium.launchPersistentContext(fallbackDir, {
         headless: isHeadless,

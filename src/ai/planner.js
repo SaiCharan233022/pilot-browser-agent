@@ -48,6 +48,62 @@ export async function createPlan(command) {
   return plan;
 }
 
+const WEB_SERVICES = {
+  'gemini': 'https://gemini.google.com',
+  'google gemini': 'https://gemini.google.com',
+  'gamma': 'https://gamma.app',
+  'gamma ai': 'https://gamma.app',
+  'gamma.app': 'https://gamma.app',
+  'youtube': 'https://www.youtube.com',
+  'github': 'https://github.com',
+  'chatgpt': 'https://chatgpt.com',
+  'perplexity': 'https://www.perplexity.ai',
+  'perplexity ai': 'https://www.perplexity.ai',
+  'claude': 'https://claude.ai',
+  'claude ai': 'https://claude.ai',
+  'deepseek': 'https://chat.deepseek.com',
+  'deepseek ai': 'https://chat.deepseek.com',
+  'huggingface': 'https://huggingface.co',
+  'leetcode': 'https://leetcode.com',
+  'canva': 'https://www.canva.com',
+  'figma': 'https://www.figma.com',
+  'notion': 'https://www.notion.so',
+  'stackoverflow': 'https://stackoverflow.com',
+  'wikipedia': 'https://www.wikipedia.org',
+  'amazon': 'https://www.amazon.com',
+  'flipkart': 'https://www.flipkart.com',
+  'linkedin': 'https://www.linkedin.com',
+  'google': 'https://www.google.com',
+  'reddit': 'https://www.reddit.com',
+  'instagram': 'https://www.instagram.com',
+  'netflix': 'https://www.netflix.com',
+  'gmail': 'https://mail.google.com',
+  'twitter': 'https://x.com',
+  'x': 'https://x.com',
+};
+
+const DESKTOP_APPS = [
+  'notepad', 'calculator', 'calc', 'vs code', 'vscode', 'visual studio code',
+  'terminal', 'powershell', 'cmd', 'paint', 'snipping tool', 'task manager',
+  'file explorer', 'explorer', 'settings', 'spotify'
+];
+
+/**
+ * Resolve any target name or string to a valid web URL.
+ */
+function resolveUrl(name) {
+  if (!name) return 'https://www.google.com';
+  const clean = name.trim().toLowerCase();
+  if (WEB_SERVICES[clean]) return WEB_SERVICES[clean];
+  if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+  if (/\.[a-z]{2,}(\/.*)?$/i.test(clean)) return `https://${clean}`;
+  const strippedAi = clean.replace(/\s+(ai|app)$/i, '');
+  if (WEB_SERVICES[strippedAi]) return WEB_SERVICES[strippedAi];
+  if (clean.endsWith(' ai')) return `https://${strippedAi}.ai`;
+  const sanitized = clean.replace(/[^a-z0-9-]/g, '');
+  return `https://www.${sanitized}.com`;
+}
+
 /**
  * High-speed local fast-path parser for system, volume, and desktop app actions.
  */
@@ -72,7 +128,6 @@ function getFastPathPlan(rawCmd) {
   const openWriteMatch = cmd.match(/^open\s+([a-z\s]+?)\s+(?:and\s+)?(?:write|type)\s+(.+)$/i);
   if (openWriteMatch) {
     const targetApp = openWriteMatch[1].trim();
-    // Extract raw text preserving original casing
     const rawTextMatch = rawCmd.match(/^open\s+[a-z\s]+?\s+(?:and\s+)?(?:write|type)\s+(.+)$/i);
     const textToWrite = rawTextMatch ? rawTextMatch[1].trim() : openWriteMatch[2].trim();
     return {
@@ -95,18 +150,43 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 3. Simple Open App / Web Service
-  const openMatch = cmd.match(/^open\s+([a-z0-9\s._-]+)$/i);
+  // 3. Open App or Web Service
+  const openMatch = cmd.match(/^open\s+([a-z0-9\s._:\/-]+)$/i);
   if (openMatch && !cmd.includes('and')) {
-    const appName = openMatch[1].trim();
+    const target = openMatch[1].trim();
+    const targetLower = target.toLowerCase();
+
+    // If it is a native desktop application
+    if (DESKTOP_APPS.includes(targetLower)) {
+      return {
+        summary: `Open ${target}`,
+        steps: [{
+          id: 1,
+          action: 'app_launch',
+          appName: target,
+          description: `Open ${target} visibly on desktop`,
+        }],
+      };
+    }
+
+    // Otherwise it is a Website / Web Service / AI Platform
+    const targetUrl = resolveUrl(target);
     return {
-      summary: `Open ${appName}`,
-      steps: [{
-        id: 1,
-        action: 'app_launch',
-        appName,
-        description: `Open ${appName} visibly on desktop`,
-      }],
+      summary: `Open ${target} (${targetUrl})`,
+      steps: [
+        {
+          id: 1,
+          action: 'navigate',
+          url: targetUrl,
+          description: `Open ${target} in browser (${targetUrl})`,
+        },
+        {
+          id: 2,
+          action: 'app_launch',
+          appName: target,
+          description: `Display ${target} window on screen`,
+        }
+      ],
     };
   }
 
