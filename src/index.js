@@ -58,11 +58,21 @@ async function main() {
     openBrowser(`http://localhost:${PORT}`);
   });
 
+  // Prevent unexpected process exits
+  process.on('uncaughtException', (err) => {
+    console.error('⚠️ Uncaught exception:', err);
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('⚠️ Unhandled rejection:', reason);
+  });
+
   // Graceful shutdown
   const shutdown = async () => {
     console.log('\n🛑 Shutting down...');
-    const { close } = await import('./browser/controller.js');
-    await close();
+    try {
+      const { close } = await import('./browser/controller.js');
+      await close();
+    } catch {}
     httpServer.close();
     process.exit(0);
   };
@@ -82,5 +92,4 @@ async function openBrowser(url) {
 
 main().catch((err) => {
   console.error('❌ Failed to start Pilot:', err);
-  process.exit(1);
 });
