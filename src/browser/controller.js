@@ -405,6 +405,29 @@ export async function getPageInfo(taskId) {
 }
 
 /**
+ * Control media playback across all open browser pages.
+ */
+export async function controlAllMedia(action) {
+  if (!browserContext) return;
+  const pages = browserContext.pages();
+  for (const p of pages) {
+    try {
+      await p.evaluate((act) => {
+        const els = document.querySelectorAll('video, audio');
+        els.forEach(el => {
+          if (act === 'pause' || act === 'stop') {
+            el.pause();
+          } else if (act === 'play' || act === 'resume') {
+            el.muted = false;
+            el.play().catch(() => {});
+          }
+        });
+      }, action);
+    } catch {}
+  }
+}
+
+/**
  * Close browser.
  */
 export async function close() {

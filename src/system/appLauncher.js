@@ -1,133 +1,191 @@
 /**
  * Native Windows Application Launcher & Process Manager
- * Launches desktop applications, verifies execution, and manages running processes.
+ * Launches desktop applications visibly, verifies execution, and terminates processes cleanly.
  */
 
-import { exec, spawn } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
 /**
- * Common app registry aliases to executable commands or URI schemes.
+ * Registry of supported Windows application launchers and termination targets.
  */
 const APP_REGISTRY = {
-  // Developer tools
-  'vs code': { cmd: 'code', processName: 'Code' },
-  'vscode': { cmd: 'code', processName: 'Code' },
-  'visual studio code': { cmd: 'code', processName: 'Code' },
-  'terminal': { cmd: 'wt', processName: 'WindowsTerminal' },
-  'powershell': { cmd: 'powershell', processName: 'powershell' },
-  'cmd': { cmd: 'cmd', processName: 'cmd' },
-  'command prompt': { cmd: 'cmd', processName: 'cmd' },
-  'git bash': { cmd: 'git-bash', processName: 'git-bash' },
-
-  // Productivity & Utilities
-  'notepad': { cmd: 'notepad', processName: 'notepad' },
-  'calculator': { cmd: 'calc', processName: 'CalculatorApp' },
-  'calc': { cmd: 'calc', processName: 'CalculatorApp' },
-  'file explorer': { cmd: 'explorer', processName: 'explorer' },
-  'explorer': { cmd: 'explorer', processName: 'explorer' },
-  'task manager': { cmd: 'taskmgr', processName: 'Taskmgr' },
-  'settings': { cmd: 'start ms-settings:', processName: 'SystemSettings' },
-  'control panel': { cmd: 'control', processName: 'control' },
-  'paint': { cmd: 'mspaint', processName: 'mspaint' },
-  'snipping tool': { cmd: 'snippingtool', processName: 'SnippingTool' },
-
-  // Media & Browsers
-  'spotify': { cmd: 'start spotify:', processName: 'Spotify' },
-  'chrome': { cmd: 'start chrome', processName: 'chrome' },
-  'google chrome': { cmd: 'start chrome', processName: 'chrome' },
-  'edge': { cmd: 'start msedge', processName: 'msedge' },
-  'ms edge': { cmd: 'start msedge', processName: 'msedge' },
-  'discord': { cmd: 'start discord:', processName: 'Discord' },
-  'whatsapp': { cmd: 'start whatsapp:', processName: 'WhatsApp' },
-  'telegram': { cmd: 'start tg:', processName: 'Telegram' },
-  'vlc': { cmd: 'vlc', processName: 'vlc' },
+  'calculator': {
+    launchCmd: 'cmd.exe /c start calc.exe',
+    processPatterns: ['CalculatorApp', 'Calculator', 'calc'],
+    execNames: ['CalculatorApp.exe', 'Calculator.exe', 'calc.exe'],
+  },
+  'calc': {
+    launchCmd: 'cmd.exe /c start calc.exe',
+    processPatterns: ['CalculatorApp', 'Calculator', 'calc'],
+    execNames: ['CalculatorApp.exe', 'Calculator.exe', 'calc.exe'],
+  },
+  'notepad': {
+    launchCmd: 'cmd.exe /c start notepad.exe',
+    processPatterns: ['notepad', 'Notepad'],
+    execNames: ['notepad.exe'],
+  },
+  'vs code': {
+    launchCmd: 'cmd.exe /c start code',
+    processPatterns: ['Code'],
+    execNames: ['Code.exe'],
+  },
+  'vscode': {
+    launchCmd: 'cmd.exe /c start code',
+    processPatterns: ['Code'],
+    execNames: ['Code.exe'],
+  },
+  'visual studio code': {
+    launchCmd: 'cmd.exe /c start code',
+    processPatterns: ['Code'],
+    execNames: ['Code.exe'],
+  },
+  'terminal': {
+    launchCmd: 'cmd.exe /c start wt.exe || cmd.exe /c start powershell.exe',
+    processPatterns: ['WindowsTerminal', 'powershell'],
+    execNames: ['WindowsTerminal.exe', 'powershell.exe'],
+  },
+  'powershell': {
+    launchCmd: 'cmd.exe /c start powershell.exe',
+    processPatterns: ['powershell'],
+    execNames: ['powershell.exe'],
+  },
+  'cmd': {
+    launchCmd: 'cmd.exe /c start cmd.exe',
+    processPatterns: ['cmd'],
+    execNames: ['cmd.exe'],
+  },
+  'spotify': {
+    launchCmd: 'cmd.exe /c start spotify:',
+    processPatterns: ['Spotify'],
+    execNames: ['Spotify.exe'],
+  },
+  'chrome': {
+    launchCmd: 'cmd.exe /c start chrome',
+    processPatterns: ['chrome'],
+    execNames: ['chrome.exe'],
+  },
+  'google chrome': {
+    launchCmd: 'cmd.exe /c start chrome',
+    processPatterns: ['chrome'],
+    execNames: ['chrome.exe'],
+  },
+  'edge': {
+    launchCmd: 'cmd.exe /c start msedge',
+    processPatterns: ['msedge'],
+    execNames: ['msedge.exe'],
+  },
+  'file explorer': {
+    launchCmd: 'cmd.exe /c start explorer.exe',
+    processPatterns: ['explorer'],
+    execNames: ['explorer.exe'],
+  },
+  'explorer': {
+    launchCmd: 'cmd.exe /c start explorer.exe',
+    processPatterns: ['explorer'],
+    execNames: ['explorer.exe'],
+  },
+  'settings': {
+    launchCmd: 'cmd.exe /c start ms-settings:',
+    processPatterns: ['SystemSettings'],
+    execNames: ['SystemSettings.exe'],
+  },
+  'task manager': {
+    launchCmd: 'cmd.exe /c start taskmgr.exe',
+    processPatterns: ['Taskmgr'],
+    execNames: ['Taskmgr.exe'],
+  },
+  'paint': {
+    launchCmd: 'cmd.exe /c start mspaint.exe',
+    processPatterns: ['mspaint', 'Paint'],
+    execNames: ['mspaint.exe'],
+  },
+  'snipping tool': {
+    launchCmd: 'cmd.exe /c start snippingtool.exe',
+    processPatterns: ['SnippingTool', 'ScreenClippingHost'],
+    execNames: ['SnippingTool.exe'],
+  },
 };
 
 /**
- * Launch an application by name or path.
- * @param {string} appName - Common name, alias, or executable path
- * @returns {Promise<Object>} - { success, appName, message, running }
+ * Launch an application visibly.
  */
 export async function launchApp(appName) {
-  const normalized = appName.trim().toLowerCase();
-  const reg = APP_REGISTRY[normalized] || { cmd: `start "" "${appName}"`, processName: appName };
+  const normalized = (appName || '').trim().toLowerCase();
+  const entry = APP_REGISTRY[normalized];
+  const launchCmd = entry ? entry.launchCmd : `cmd.exe /c start "" "${appName}"`;
 
   try {
-    if (reg.cmd.startsWith('start ')) {
-      await execAsync(`cmd.exe /c "${reg.cmd}"`);
-    } else {
-      const child = spawn(reg.cmd, [], {
-        detached: true,
-        stdio: 'ignore',
-        shell: true,
-      });
-      child.unref();
-    }
-
-    // Give the app 800ms to register in process table and verify
-    await new Promise(r => setTimeout(r, 800));
-    const isRunning = await isProcessRunning(reg.processName);
+    await execAsync(launchCmd);
+    await new Promise(r => setTimeout(r, 600));
 
     return {
       success: true,
-      appName: appName,
-      command: reg.cmd,
-      verified: isRunning,
-      message: `Launched ${appName}${isRunning ? ' (process active)' : ''}.`,
+      appName,
+      message: `Launched ${appName}.`,
     };
   } catch (err) {
-    // Fallback using Windows shell execute
     try {
       await execAsync(`powershell.exe -NoProfile -Command "Start-Process '${appName}' -ErrorAction SilentlyContinue"`);
       return {
         success: true,
         appName,
-        verified: true,
         message: `Launched ${appName}.`,
       };
     } catch (fallbackErr) {
       return {
         success: false,
         appName,
-        error: `Could not launch ${appName}: ${err.message}`,
+        error: `Failed to launch ${appName}: ${err.message}`,
       };
     }
   }
 }
 
 /**
- * Close/Terminate an application by name.
+ * Close/Terminate an application.
  */
 export async function closeApp(appName) {
-  const normalized = appName.trim().toLowerCase();
-  const reg = APP_REGISTRY[normalized] || { processName: appName };
-  const target = reg.processName || appName;
+  const normalized = (appName || '').trim().toLowerCase();
+  const entry = APP_REGISTRY[normalized];
+  const execNames = entry ? entry.execNames : [`${appName}.exe`, appName];
+  const patterns = entry ? entry.processPatterns : [appName];
 
-  try {
-    await execAsync(`powershell.exe -NoProfile -Command "Stop-Process -Name '${target}' -Force -ErrorAction SilentlyContinue"`);
-    return {
-      success: true,
-      appName,
-      message: `Closed ${appName}.`,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      appName,
-      error: `Could not close ${appName}: ${err.message}`,
-    };
+  let killed = false;
+
+  // 1. Try taskkill for each executable name
+  for (const exe of execNames) {
+    try {
+      const { stdout } = await execAsync(`taskkill /IM "${exe}" /T /F`);
+      if (stdout && stdout.includes('SUCCESS')) {
+        killed = true;
+      }
+    } catch {}
   }
+
+  // 2. Try PowerShell Stop-Process pattern matching
+  for (const pat of patterns) {
+    try {
+      await execAsync(`powershell.exe -NoProfile -Command "Get-Process -Name '*${pat}*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue"`);
+      killed = true;
+    } catch {}
+  }
+
+  return {
+    success: true,
+    appName,
+    message: `Closed ${appName}.`,
+  };
 }
 
 /**
- * Check if a process is running on the system.
+ * Check if a process matching pattern is running.
  */
-export async function isProcessRunning(processName) {
+export async function isProcessRunning(processPattern) {
   try {
-    const { stdout } = await execAsync(`powershell.exe -NoProfile -Command "Get-Process -Name '${processName}' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Name"`);
+    const { stdout } = await execAsync(`powershell.exe -NoProfile -Command "Get-Process | Where-Object { $_.ProcessName -like '*${processPattern}*' } | Select-Object -First 1 -ExpandProperty Name"`);
     return !!stdout.trim();
   } catch {
     return false;

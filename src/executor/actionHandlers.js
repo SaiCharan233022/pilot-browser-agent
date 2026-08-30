@@ -52,7 +52,11 @@ const actionMap = {
   media_control: async (step) => {
     const mediaAction = step.mediaAction || step.direction || step.text || 'toggle';
     const val = step.amount || step.value;
-    return await executeMediaAction(mediaAction, val);
+    const osResult = await executeMediaAction(mediaAction, val);
+    try {
+      await browser.controlAllMedia(mediaAction);
+    } catch {}
+    return osResult;
   },
 
   /**
