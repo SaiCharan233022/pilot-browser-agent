@@ -58,6 +58,9 @@ async function main() {
     openBrowser(`http://localhost:${PORT}`);
   });
 
+  // Keep process alive indefinitely
+  setInterval(() => {}, 60000);
+
   // Prevent unexpected process exits
   process.on('uncaughtException', (err) => {
     console.error('⚠️ Uncaught exception:', err);
@@ -65,26 +68,14 @@ async function main() {
   process.on('unhandledRejection', (reason) => {
     console.error('⚠️ Unhandled rejection:', reason);
   });
-
-  // Graceful shutdown
-  const shutdown = async () => {
-    console.log('\n🛑 Shutting down...');
-    try {
-      const { close } = await import('./browser/controller.js');
-      await close();
-    } catch {}
-    httpServer.close();
-    process.exit(0);
-  };
-
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
 }
 
 async function openBrowser(url) {
+  // Only attempt auto-open if in an interactive shell
+  if (process.env.NO_AUTO_OPEN === 'true') return;
   try {
     const open = (await import('open')).default;
-    await open(url);
+    await open(url, { wait: false });
   } catch {
     console.log(`  Open your browser to: ${url}`);
   }
