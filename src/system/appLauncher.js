@@ -107,6 +107,68 @@ const APP_REGISTRY = {
     processPatterns: ['SnippingTool', 'ScreenClippingHost'],
     execNames: ['SnippingTool.exe'],
   },
+
+  // Web Applications & Media Services (Launch natively or via default browser)
+  'youtube': {
+    launchCmd: 'cmd.exe /c start https://www.youtube.com',
+    processPatterns: ['chrome', 'msedge', 'brave', 'firefox'],
+    execNames: ['chrome.exe', 'msedge.exe'],
+  },
+  'chatgpt': {
+    launchCmd: 'cmd.exe /c start https://chatgpt.com',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'reddit': {
+    launchCmd: 'cmd.exe /c start https://www.reddit.com',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'github': {
+    launchCmd: 'cmd.exe /c start https://github.com',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'instagram': {
+    launchCmd: 'cmd.exe /c start https://www.instagram.com',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'netflix': {
+    launchCmd: 'cmd.exe /c start netflix: || cmd.exe /c start https://www.netflix.com',
+    processPatterns: ['Netflix', 'chrome', 'msedge'],
+    execNames: ['Netflix.exe', 'chrome.exe'],
+  },
+  'gmail': {
+    launchCmd: 'cmd.exe /c start https://mail.google.com',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'whatsapp': {
+    launchCmd: 'cmd.exe /c start whatsapp: || cmd.exe /c start https://web.whatsapp.com',
+    processPatterns: ['WhatsApp', 'WhatsAppRoot'],
+    execNames: ['WhatsApp.exe'],
+  },
+  'discord': {
+    launchCmd: 'cmd.exe /c start discord: || cmd.exe /c start https://discord.com/app',
+    processPatterns: ['Discord'],
+    execNames: ['Discord.exe'],
+  },
+  'telegram': {
+    launchCmd: 'cmd.exe /c start tg: || cmd.exe /c start https://web.telegram.org',
+    processPatterns: ['Telegram'],
+    execNames: ['Telegram.exe'],
+  },
+  'twitter': {
+    launchCmd: 'cmd.exe /c start https://x.com',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'x': {
+    launchCmd: 'cmd.exe /c start https://x.com',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
 };
 
 /**

@@ -8,6 +8,7 @@ import { chromium } from 'playwright';
 import { join } from 'path';
 import { mkdirSync, writeFileSync } from 'fs';
 import { getProfilePath, ensureDataDirs, cleanProfileLocks } from './profile.js';
+import { focusWindow } from '../system/desktopController.js';
 
 let browserContext = null;
 let activePage = null;
@@ -133,7 +134,13 @@ export async function navigate(url, taskId) {
     }
     await page.goto(url, { waitUntil: 'commit', timeout: 20000 });
     await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
-    try { await page.bringToFront(); } catch {}
+    try {
+      await page.bringToFront();
+    } catch {}
+    try {
+      focusWindow('chrome').catch(() => {});
+      focusWindow('chromium').catch(() => {});
+    } catch {}
     await ensureMediaPlays(page);
     return { success: true, url: page.url(), title: await page.title().catch(() => '') };
   } catch (err) {
