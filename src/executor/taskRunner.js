@@ -239,17 +239,26 @@ export async function runTask(command, options = {}) {
 
   // === SUMMARIZATION PHASE ===
   let summary = '';
-  const isAllSystemActions = plan.steps.every(s => ['media_control', 'app_launch', 'app_close'].includes(s.action));
+  const systemActionSet = ['media_control', 'app_launch', 'app_close', 'open_and_play', 'desktop_focus', 'desktop_type', 'desktop_key'];
+  const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
   if (isAllSystemActions && task.completedSteps.length > 0) {
     const lastStep = task.completedSteps[task.completedSteps.length - 1];
     if (lastStep.action === 'media_control') {
       const act = lastStep.mediaAction || 'media action';
       summary = lastStep.amount != null ? `System volume set to ${lastStep.amount}%.` : `Media action (${act}) executed successfully.`;
+    } else if (lastStep.action === 'open_and_play') {
+      summary = `Opened ${lastStep.appName || 'Spotify'} and started playback of your song.`;
     } else if (lastStep.action === 'app_launch') {
       summary = `Launched ${lastStep.appName || 'application'}.`;
     } else if (lastStep.action === 'app_close') {
       summary = `Closed ${lastStep.appName || 'application'}.`;
+    } else if (lastStep.action === 'desktop_type') {
+      summary = `Typed into ${lastStep.appName || 'application'}.`;
+    } else if (lastStep.action === 'desktop_key') {
+      summary = `Executed ${lastStep.key || 'key command'}.`;
+    } else {
+      summary = `Task completed successfully.`;
     }
   } else {
     broadcast({ type: 'status', status: 'summarizing', message: 'Formatting final output...', taskId: plan.taskId });

@@ -26,6 +26,7 @@ export async function createPlan(command) {
       action: validateAction(step.action),
       mediaAction: step.mediaAction || null,
       appName: step.appName || null,
+      key: step.key || null,
       url: step.url || null,
       selector: step.selector || null,
       text: step.text || null,
@@ -51,7 +52,8 @@ export async function createPlan(command) {
  */
 function validateAction(action) {
   const validActions = [
-    'media_control', 'app_launch', 'app_close',
+    'media_control', 'app_launch', 'app_close', 'open_and_play',
+    'desktop_focus', 'desktop_type', 'desktop_key',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',
   ];

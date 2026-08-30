@@ -7,6 +7,7 @@ import * as browser from '../browser/controller.js';
 import { analyzeScreenshot, findSelector } from '../ai/gemini.js';
 import { executeMediaAction } from '../system/mediaController.js';
 import { launchApp, closeApp, getRunningApps } from '../system/appLauncher.js';
+import { focusWindow, typeDesktopText, sendDesktopKey, openAndPlay } from '../system/desktopController.js';
 
 /**
  * Execute a single action step.
@@ -73,6 +74,36 @@ const actionMap = {
   app_close: async (step) => {
     const target = step.appName || step.text || step.description;
     return await closeApp(target);
+  },
+
+  /**
+   * Compound: Open application and immediately trigger playback.
+   */
+  open_and_play: async (step) => {
+    const target = step.appName || step.text || 'spotify';
+    return await openAndPlay(target);
+  },
+
+  /**
+   * Focus desktop window.
+   */
+  desktop_focus: async (step) => {
+    const target = step.appName || step.text || step.description;
+    return await focusWindow(target);
+  },
+
+  /**
+   * Type text into desktop application.
+   */
+  desktop_type: async (step) => {
+    return await typeDesktopText(step.text, step.appName || '');
+  },
+
+  /**
+   * Send keyboard key to desktop application.
+   */
+  desktop_key: async (step) => {
+    return await sendDesktopKey(step.key || step.text || 'enter', step.appName || '');
   },
 
   /**
