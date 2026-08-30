@@ -131,9 +131,11 @@ export async function navigate(url, taskId) {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.goto(url, { waitUntil: 'commit', timeout: 20000 });
+    await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
     try { await page.bringToFront(); } catch {}
-    return { success: true, url: page.url(), title: await page.title() };
+    await ensureMediaPlays(page);
+    return { success: true, url: page.url(), title: await page.title().catch(() => '') };
   } catch (err) {
     return { success: false, error: err.message };
   }
