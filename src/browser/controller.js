@@ -7,7 +7,7 @@
 import { chromium } from 'playwright';
 import { join } from 'path';
 import { mkdirSync, writeFileSync } from 'fs';
-import { getProfilePath, ensureDataDirs } from './profile.js';
+import { getProfilePath, ensureDataDirs, cleanProfileLocks } from './profile.js';
 
 let browserContext = null;
 let activePage = null;
@@ -31,43 +31,58 @@ export async function launch(options = {}) {
 
   isHeadless = options.headless ?? false;
   const profileDir = getProfilePath(options.profilePath || 'auto');
+  cleanProfileLocks(profileDir);
+
+  const launchArgs = [
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-blink-features=AutomationControlled',
+    '--disable-infobars',
+    '--autoplay-policy=no-user-gesture-required',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies,Translate,OptimizationHints',
+  ];
 
   try {
     browserContext = await chromium.launchPersistentContext(profileDir, {
-      channel: 'chrome',
       headless: isHeadless,
-      args: [
-        '--no-first-run',
-        '--no-default-browser-check',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-infobars',
-        '--autoplay-policy=no-user-gesture-required',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies,Translate,OptimizationHints',
-      ],
+      args: launchArgs,
       viewport: { width: 1366, height: 768 },
       ignoreDefaultArgs: ['--enable-automation', '--mute-audio'],
     });
-
-    const pages = browserContext.pages();
-    activePage = pages.length > 0 ? pages[0] : await browserContext.newPage();
-
-    browserContext.on('page', (page) => {
-      activePage = page;
-    });
-
-    onStatusChange?.('open');
-  } catch (err) {
-    console.error('❌ Failed to launch browser:', err.message);
-    if (err.message.includes('lock') || err.message.includes('already running')) {
-      throw new Error(
-        'Chrome profile is locked. Please close any open Chrome windows and retry.'
-      );
+  } catch (launchErr) {
+    console.warn('⚠️  Persistent launch had issue, attempting clean fallback launch...', launchErr.message);
+    cleanProfileLocks(profileDir);
+    try {
+      const fallbackDir = join(process.cwd(), 'data', 'temp-session');
+      mkdirSync(fallbackDir, { recursive: true });
+      browserContext = await chromium.launchPersistentContext(fallbackDir, {
+        headless: isHeadless,
+        args: launchArgs,
+        viewport: { width: 1366, height: 768 },
+        ignoreDefaultArgs: ['--enable-automation', '--mute-audio'],
+      });
+    } catch (fallbackErr) {
+      const browserInstance = await chromium.launch({
+        headless: isHeadless,
+        args: launchArgs,
+      });
+      browserContext = await browserInstance.newContext({
+        viewport: { width: 1366, height: 768 },
+      });
     }
-    throw err;
   }
+
+  const pages = browserContext.pages();
+  activePage = pages.length > 0 ? pages[0] : await browserContext.newPage();
+
+  browserContext.on('page', (page) => {
+    activePage = page;
+  });
+
+  onStatusChange?.('open');
 }
 
 /**
