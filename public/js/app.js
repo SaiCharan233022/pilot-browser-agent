@@ -199,22 +199,14 @@ function addUserMessage(text) {
 }
 
 function renderPlan(msg) {
-  const div = document.createElement('div');
-  div.className = 'message agent';
-  div.id = `plan-${msg.taskId}`;
-
-  const stepsHtml = msg.steps.map(step => `
-    <div class="plan-step" data-step-id="${step.id}" id="step-${msg.taskId}-${step.id}">
-      <div class="step-indicator pending" id="indicator-${msg.taskId}-${step.id}">
-        ${step.id}
-      </div>
-      <div class="step-content">
-        <div class="step-description">${escapeHtml(step.description)}</div>
-        <div class="step-result" id="result-${msg.taskId}-${step.id}" style="display:none;"></div>
-        <div class="step-screenshot" id="screenshot-${msg.taskId}-${step.id}"></div>
-      </div>
-    </div>
-  `).join('');
+  showMessages();
+  let div = msg.taskId ? $(`#msg-${msg.taskId}`) : null;
+  if (!div) {
+    div = document.createElement('div');
+    div.className = 'message agent';
+    if (msg.taskId) div.id = `msg-${msg.taskId}`;
+    messagesContainer.appendChild(div);
+  }
 
   div.innerHTML = `
     <div class="message-body">
@@ -223,156 +215,79 @@ function renderPlan(msg) {
         <span class="message-sender">Pilot</span>
         <span class="message-time">${formatTime()}</span>
       </div>
-      <div class="plan-card">
-        <div class="plan-header">
-          <span class="plan-header-icon">📋</span>
-          <div class="plan-header-text">
-            <h3>Execution Plan</h3>
-            <p>${escapeHtml(msg.summary)}</p>
-          </div>
-          <span class="plan-step-count">${msg.steps.length} steps</span>
-        </div>
-        <div class="plan-steps" id="steps-container-${msg.taskId}">
-          ${stepsHtml}
-        </div>
+      <div class="agent-live-status" id="live-status-${msg.taskId}">
+        <div class="spinner"></div> <span>${escapeHtml(msg.summary || 'Executing task...')}</span>
       </div>
     </div>
   `;
 
-  messagesContainer.appendChild(div);
   activePlans.set(msg.taskId, { steps: msg.steps, element: div });
   scrollToBottom();
 }
 
 function updateStepStatus(taskId, stepId, status, description, result, screenshot, error) {
-  const indicator = $(`#indicator-${taskId}-${stepId}`);
-  const resultEl = $(`#result-${taskId}-${stepId}`);
-  const screenshotEl = $(`#screenshot-${taskId}-${stepId}`);
-
-  if (indicator) {
-    indicator.className = `step-indicator ${status}`;
-    const icons = {
-      pending: stepId,
-      running: '⟳',
-      completed: '✓',
-      failed: '✗',
-      skipped: '—',
-    };
-    indicator.textContent = icons[status] || stepId;
+  const statusEl = $(`#live-status-${taskId}`);
+  if (statusEl && description) {
+    statusEl.innerHTML = `<div class="spinner"></div> <span>${escapeHtml(description)}...</span>`;
   }
-
-  if (result && resultEl) {
-    resultEl.style.display = 'block';
-    resultEl.textContent = typeof result === 'string' ? result : JSON.stringify(result);
-  }
-
-  if (error && resultEl) {
-    resultEl.style.display = 'block';
-    resultEl.className = 'step-error';
-    resultEl.textContent = error;
-  }
-
   scrollToBottom();
 }
 
 function appendNewStepsToPlan(taskId, newSteps) {
-  const container = $(`#steps-container-${taskId}`);
-  if (!container) return;
-
-  const html = newSteps.map(step => `
-    <div class="plan-step" data-step-id="${step.id}" id="step-${taskId}-${step.id}">
-      <div class="step-indicator pending" id="indicator-${taskId}-${step.id}">
-        ${step.id}
-      </div>
-      <div class="step-content">
-        <div class="step-description">${escapeHtml(step.description)}</div>
-        <div class="step-result" id="result-${taskId}-${step.id}" style="display:none;"></div>
-        <div class="step-screenshot" id="screenshot-${taskId}-${step.id}"></div>
-      </div>
-    </div>
-  `).join('');
-
-  container.insertAdjacentHTML('beforeend', html);
+  const statusEl = $(`#live-status-${taskId}`);
+  if (statusEl && newSteps.length > 0) {
+    statusEl.innerHTML = `<div class="spinner"></div> <span>${escapeHtml(newSteps[0].description)}...</span>`;
+  }
   scrollToBottom();
 }
 
 function renderApprovalRequest(msg) {
+  removeStatusMessage();
   const div = document.createElement('div');
   div.className = 'message agent';
   div.id = `approval-${msg.taskId}-${msg.stepId}`;
 
-  let screenshotHtml = '';
-  if (msg.screenshot) {
-    screenshotHtml = `
-      <div class="screenshot-thumb" style="margin-bottom: var(--space-md);">
-        <img src="data:image/png;base64,${msg.screenshot}" alt="Current page">
-      </div>
-    `;
-  }
-
   div.innerHTML = `
     <div class="message-body">
-      <div class="approval-card">
-        <div class="approval-header">
-          ⚠️ Approval Required
-        </div>
-        <div class="approval-desc">${escapeHtml(msg.description)}</div>
-        ${screenshotHtml}
-        <div class="approval-actions">
-          <button class="btn-approve" onclick="handleApproval('${msg.taskId}', ${msg.stepId}, true)">
-            ✅ Approve
-          </button>
-          <button class="btn-reject" onclick="handleApproval('${msg.taskId}', ${msg.stepId}, false)">
-            ❌ Skip
-          </button>
-        </div>
+      <div class="message-header">
+        <div class="message-avatar">🧭</div>
+        <span class="message-sender">Pilot</span>
+        <span class="message-time">${formatTime()}</span>
       </div>
+      <div class="agent-output">${escapeHtml(msg.description)}</div>
     </div>
   `;
 
   messagesContainer.appendChild(div);
   scrollToBottom();
-
-  // Add lightbox to screenshot
-  const thumb = div.querySelector('.screenshot-thumb');
-  if (thumb && msg.screenshot) {
-    thumb.addEventListener('click', () => openLightbox(`data:image/png;base64,${msg.screenshot}`));
-  }
 }
 
 function renderTaskSummary(msg) {
-  const div = document.createElement('div');
-  div.className = 'message agent';
+  removeStatusMessage();
+  let div = msg.taskId ? $(`#msg-${msg.taskId}`) : null;
+  if (!div) {
+    div = document.createElement('div');
+    div.className = 'message agent';
+    if (msg.taskId) div.id = `msg-${msg.taskId}`;
+    messagesContainer.appendChild(div);
+  }
 
   // Convert markdown-like formatting to HTML
   const summaryHtml = markdownToHtml(msg.summary || 'Completed.');
 
-  if (!msg.totalSteps || msg.totalSteps === 0) {
-    div.innerHTML = `
-      <div class="message-body">
-        <div class="message-header">
-          <div class="message-avatar">🧭</div>
-          <span class="message-sender">Pilot</span>
-          <span class="message-time">${formatTime()}</span>
-        </div>
-        <div class="direct-response">${summaryHtml}</div>
+  div.innerHTML = `
+    <div class="message-body">
+      <div class="message-header">
+        <div class="message-avatar">🧭</div>
+        <span class="message-sender">Pilot</span>
+        <span class="message-time">${formatTime()}</span>
       </div>
-    `;
-  } else {
-    div.innerHTML = `
-      <div class="message-body">
-        <div class="summary-card">
-          <div class="summary-header">
-            <span>⚡</span>
-            <h3>Result</h3>
-          </div>
-          <div class="summary-body">${summaryHtml}</div>
-        </div>
-      </div>
-    `;
-  }
+      <div class="agent-output">${summaryHtml}</div>
+    </div>
+  `;
 
-  messagesContainer.appendChild(div);
+  scrollToBottom();
+}
   scrollToBottom();
 }
 

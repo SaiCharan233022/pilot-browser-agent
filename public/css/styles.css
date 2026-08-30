@@ -555,9 +555,50 @@ a:hover {
   font-size: 11px;
 }
 
-/* Plan Message */
-.plan-card {
+.agent-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 14px;
   background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  color: var(--text-secondary);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.agent-output {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.agent-output p {
+  margin-bottom: var(--space-sm);
+}
+
+.agent-output p:last-child {
+  margin-bottom: 0;
+}
+
+.agent-output table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-md) 0;
+  font-size: 13px;
+}
+
+.agent-output th, .agent-output td {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.agent-output th {
+  background: var(--bg-elevated);
+  color: var(--primary-400);
+}
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;

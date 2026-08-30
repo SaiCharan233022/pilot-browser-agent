@@ -58,17 +58,23 @@ async function callGeminiWithFallback(modelOptions, generateArgs) {
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
+        generationConfig: {
+          maxOutputTokens: 600,
+          temperature: 0.1,
+          ...(modelOptions.generationConfig || {}),
+        },
         ...modelOptions,
       });
       const result = await model.generateContent(generateArgs);
-      workingModelName = modelName; // Cache the successful model
+      workingModelName = modelName; // Cache successful model
       return result.response.text();
     } catch (err) {
       lastError = err;
-      console.warn(`⚠️ Model ${modelName} failed (${err.message}), trying fallback...`);
+      workingModelName = null; // Clear cache on error
+      console.warn(`⚠️ Model ${modelName} error (${err.message}), trying next model...`);
     }
   }
-  throw lastError || new Error('All Gemini model candidates failed');
+  throw lastError || new Error('All Gemini models failed');
 }
 
 /**
