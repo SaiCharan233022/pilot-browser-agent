@@ -160,9 +160,34 @@ function getFastPathPlan(rawCmd) {
   if (openMatch && !cmd.includes('and')) {
     const target = openMatch[1].trim();
     const targetLower = target.toLowerCase();
+    const baseTarget = targetLower.replace(/\s+(ai|app|website|site|web)$/i, '').trim();
 
-    // If it is a native desktop application
-    if (DESKTOP_APPS.includes(targetLower)) {
+    const isExplicitWeb = WEB_SERVICES[targetLower] ||
+                          WEB_SERVICES[baseTarget] ||
+                          targetLower.startsWith('http://') ||
+                          targetLower.startsWith('https://') ||
+                          targetLower.startsWith('www.') ||
+                          /\.[a-z]{2,}(\/.*)?$/i.test(targetLower) ||
+                          targetLower.endsWith(' ai') ||
+                          targetLower.endsWith(' website') ||
+                          targetLower.endsWith(' site');
+
+    if (isExplicitWeb) {
+      const targetUrl = resolveUrl(target);
+      return {
+        summary: `Open ${target}`,
+        steps: [
+          {
+            id: 1,
+            action: 'navigate',
+            targetName: target,
+            url: targetUrl,
+            description: `Open ${target} directly on screen`,
+          },
+        ],
+      };
+    } else {
+      // It is a laptop desktop application (e.g. Spotify, Notepad, Calculator, VS Code, AutoCAD, WhatsApp, etc.)
       return {
         summary: `Open ${target}`,
         steps: [{
@@ -173,21 +198,6 @@ function getFastPathPlan(rawCmd) {
         }],
       };
     }
-
-    // Otherwise it is a Website / Web Service / AI Platform / Custom URL
-    const targetUrl = resolveUrl(target);
-    return {
-      summary: `Open ${target}`,
-      steps: [
-        {
-          id: 1,
-          action: 'navigate',
-          targetName: target,
-          url: targetUrl,
-          description: `Open ${target} directly on screen`,
-        },
-      ],
-    };
   }
 
   // 4. Close App

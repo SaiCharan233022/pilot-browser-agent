@@ -313,26 +313,57 @@ function resolveAppOrWebCommand(name) {
  * Launch an application or website visibly in foreground.
  */
 export async function launchApp(appName) {
-  const launchCmd = resolveAppOrWebCommand(appName);
+  const normalized = (appName || '').trim().toLowerCase();
 
+  // 1. Direct custom registry match
+  if (APP_REGISTRY[normalized]) {
+    try {
+      await execAsync(APP_REGISTRY[normalized].launchCmd);
+      await new Promise(r => setTimeout(r, 400));
+      return {
+        success: true,
+        appName,
+        message: `Launched ${appName}.`,
+      };
+    } catch {}
+  }
+
+  // 2. Query Windows Get-StartApps to find ANY installed laptop application
   try {
-    await execAsync(launchCmd);
-    await new Promise(r => setTimeout(r, 400));
+    const base64Query = Buffer.from(normalized, 'utf-8').toString('base64');
+    const psScript = `$q = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${base64Query}')).ToLower(); $app = Get-StartApps | Where-Object { $_.Name.ToLower().Contains($q) -or $_.AppID.ToLower().Contains($q) } | Select-Object -First 1; if ($app) { Start-Process explorer.exe ("shell:AppsFolder\" + $app.AppID); Write-Output ("FOUND:" + $app.Name) } else { Write-Output "NOT_FOUND" }`;
+    const { stdout } = await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "${psScript}"`);
+    if (stdout && stdout.includes('FOUND:')) {
+      await new Promise(r => setTimeout(r, 400));
+      return {
+        success: true,
+        appName,
+        message: `Launched ${appName}.`,
+      };
+    }
+  } catch {}
 
+  // 3. Try standard Windows executable / protocol launch
+  try {
+    const fallbackCmd = `powershell.exe -NoProfile -Command "Start-Process '${appName}.exe' -ErrorAction SilentlyContinue; if (!$?) { Start-Process '${appName}:' -ErrorAction SilentlyContinue; if (!$?) { Start-Process '${appName}' } }"`;
+    await execAsync(fallbackCmd);
+    await new Promise(r => setTimeout(r, 400));
     return {
       success: true,
       appName,
       message: `Launched ${appName}.`,
     };
   } catch (err) {
+    // 4. Fallback to web search
     try {
-      await execAsync(`powershell.exe -NoProfile -Command "Start-Process '${appName}' -ErrorAction SilentlyContinue"`);
+      const url = `https://www.${normalized.replace(/[^a-z0-9-]/g, '')}.com`;
+      await execAsync(`powershell.exe -NoProfile -Command "Start-Process '${url}'"`);
       return {
         success: true,
         appName,
-        message: `Launched ${appName}.`,
+        message: `Opened ${appName}.`,
       };
-    } catch (fallbackErr) {
+    } catch {
       return {
         success: false,
         appName,
