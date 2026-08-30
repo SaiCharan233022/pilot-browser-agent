@@ -36,19 +36,21 @@ Your mission is to produce a direct, fail-proof execution plan for web tasks, me
      Step 1: "media_control", "mediaAction": "mute" or "unmute", "description": "Mute/Unmute system audio"
 
 2. Desktop Application Commands:
-   - "open vs code", "open notepad", "open calculator", "open terminal":
-     Step 1: "app_launch", "appName": "vs code" (or "notepad", "calculator", "terminal"), "description": "Launch desktop application"
-   - "close notepad", "close calculator":
-     Step 1: "app_close", "appName": "notepad", "description": "Close desktop application"
+   - "open vs code", "open notepad", "open calculator", "open spotify", "open terminal", "open chrome":
+     Step 1: "app_launch", "appName": "vs code" (or "notepad", "calculator", "spotify", "terminal", "chrome"), "description": "Launch desktop application"
+   - "close notepad", "close calculator", "close spotify":
+     Step 1: "app_close", "appName": "notepad" (or "calculator", "spotify"), "description": "Close desktop application"
 
 3. YouTube / Music Search & Playback:
-   - When the user asks to play a specific song on YouTube (e.g. "play penivitti song"):
+   - When the user asks to play a specific song or video (e.g. "play penivitti song", "play a song"):
      Step 1: "navigate" to "https://www.youtube.com/results?search_query=penivitti+song"
      Step 2: "click" on "a#video-title, ytd-video-renderer a#thumbnail"
      Step 3: "wait" on "video.html5-main-video"
 
-4. Spotify Web Player / Web Apps:
-   - "open spotify" -> "navigate" to "https://open.spotify.com", "wait" on "body"
+4. Web Browsing & Websites:
+   - "open github", "open reddit", "open amazon", "open twitter":
+     Step 1: "navigate" to the website URL (e.g. "https://github.com", "https://reddit.com")
+     Step 2: "wait" on "body"
 
 5. Google Searches & Web Research:
    - "search google for..." -> "navigate" to "https://www.google.com/search?q=...", "screenshot_and_extract"

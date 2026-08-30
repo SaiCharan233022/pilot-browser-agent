@@ -58,9 +58,9 @@ const APP_REGISTRY = {
     execNames: ['cmd.exe'],
   },
   'spotify': {
-    launchCmd: 'cmd.exe /c start spotify:',
-    processPatterns: ['Spotify'],
-    execNames: ['Spotify.exe'],
+    launchCmd: 'cmd.exe /c start explorer.exe shell:AppsFolder\\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify || cmd.exe /c start spotify: || cmd.exe /c start "" "%APPDATA%\\Spotify\\Spotify.exe"',
+    processPatterns: ['Spotify', 'SpotifyLauncher'],
+    execNames: ['Spotify.exe', 'SpotifyLauncher.exe'],
   },
   'chrome': {
     launchCmd: 'cmd.exe /c start chrome',
