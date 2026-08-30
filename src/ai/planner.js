@@ -50,13 +50,16 @@ export async function createPlan(command) {
 
 const WEB_SERVICES = {
   'gemini': 'https://gemini.google.com',
+  'gemini ai': 'https://gemini.google.com',
   'google gemini': 'https://gemini.google.com',
+  'google gemini ai': 'https://gemini.google.com',
   'gamma': 'https://gamma.app',
   'gamma ai': 'https://gamma.app',
   'gamma.app': 'https://gamma.app',
   'youtube': 'https://www.youtube.com',
   'github': 'https://github.com',
   'chatgpt': 'https://chatgpt.com',
+  'chatgpt ai': 'https://chatgpt.com',
   'perplexity': 'https://www.perplexity.ai',
   'perplexity ai': 'https://www.perplexity.ai',
   'claude': 'https://claude.ai',
@@ -93,13 +96,15 @@ const DESKTOP_APPS = [
  */
 function resolveUrl(name) {
   if (!name) return 'https://www.google.com';
-  const clean = name.trim().toLowerCase();
+  let clean = name.trim().toLowerCase();
   if (WEB_SERVICES[clean]) return WEB_SERVICES[clean];
   if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+
+  const base = clean.replace(/\s+(ai|app|website|site|web)$/i, '').trim();
+  if (WEB_SERVICES[base]) return WEB_SERVICES[base];
+
   if (/\.[a-z]{2,}(\/.*)?$/i.test(clean)) return `https://${clean}`;
-  const strippedAi = clean.replace(/\s+(ai|app)$/i, '');
-  if (WEB_SERVICES[strippedAi]) return WEB_SERVICES[strippedAi];
-  if (clean.endsWith(' ai')) return `https://${strippedAi}.ai`;
+  if (clean.endsWith(' ai')) return `https://${base}.ai`;
   const sanitized = clean.replace(/[^a-z0-9-]/g, '');
   return `https://www.${sanitized}.com`;
 }
@@ -150,7 +155,7 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 3. Open App or Web Service
+  // 3. Open App or Web Service / Any Website
   const openMatch = cmd.match(/^open\s+([a-z0-9\s._:\/-]+)$/i);
   if (openMatch && !cmd.includes('and')) {
     const target = openMatch[1].trim();
@@ -169,7 +174,7 @@ function getFastPathPlan(rawCmd) {
       };
     }
 
-    // Otherwise it is a Website / Web Service / AI Platform
+    // Otherwise it is a Website / Web Service / AI Platform / Custom URL
     const targetUrl = resolveUrl(target);
     return {
       summary: `Open ${target} (${targetUrl})`,
@@ -180,12 +185,6 @@ function getFastPathPlan(rawCmd) {
           url: targetUrl,
           description: `Open ${target} in browser (${targetUrl})`,
         },
-        {
-          id: 2,
-          action: 'app_launch',
-          appName: target,
-          description: `Display ${target} window on screen`,
-        }
       ],
     };
   }

@@ -81,7 +81,11 @@ export function saveTask(plan) {
  * Save or update a step.
  */
 export function saveStep(taskId, step) {
-  if (!db) return;
+  if (!db || !step) return;
+
+  const action = step.action || 'navigate';
+  const description = step.description || '';
+  const status = step.status || 'pending';
 
   // Check if step exists
   const existing = db.prepare(
@@ -90,10 +94,12 @@ export function saveStep(taskId, step) {
 
   if (existing) {
     db.prepare(`
-      UPDATE steps SET status = ?, result = ?, screenshot_file = ?, error = ?, timestamp = ?
+      UPDATE steps SET action = ?, description = ?, status = ?, result = ?, screenshot_file = ?, error = ?, timestamp = ?
       WHERE task_id = ? AND step_id = ?
     `).run(
-      step.status,
+      action,
+      description,
+      status,
       step.result ? JSON.stringify(step.result) : null,
       step.screenshot || null,
       step.result?.error || null,
@@ -107,11 +113,11 @@ export function saveStep(taskId, step) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       taskId,
-      step.id,
-      step.action,
-      step.description,
+      step.id || 1,
+      action,
+      description,
       step.selector || null,
-      step.status || 'pending',
+      status,
       step.result ? JSON.stringify(step.result) : null,
       step.screenshot || null,
       step.result?.error || null,

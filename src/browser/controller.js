@@ -322,16 +322,20 @@ async function ensureMediaPlays(page) {
  */
 export async function screenshot(savePath, taskId) {
   const page = await getTaskPage(taskId);
-  const buffer = await page.screenshot({ fullPage: false, type: 'png' });
+  try {
+    const buffer = await page.screenshot({ fullPage: false, type: 'png', timeout: 4000 });
 
-  if (savePath) {
-    const dir = join(process.cwd(), 'data', 'screenshots');
-    mkdirSync(dir, { recursive: true });
-    const fullPath = join(dir, savePath);
-    writeFileSync(fullPath, buffer);
+    if (savePath) {
+      const dir = join(process.cwd(), 'data', 'screenshots');
+      mkdirSync(dir, { recursive: true });
+      const fullPath = join(dir, savePath);
+      writeFileSync(fullPath, buffer);
+    }
+
+    return buffer;
+  } catch (err) {
+    return Buffer.from('');
   }
-
-  return buffer;
 }
 
 /**
