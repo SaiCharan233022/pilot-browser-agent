@@ -100,11 +100,13 @@ function handleServerMessage(msg) {
       break;
 
     case 'plan':
+      removeStatusMessage();
       showMessages();
       renderPlan(msg);
       break;
 
     case 'step_start':
+      removeStatusMessage();
       updateStepStatus(msg.taskId, msg.stepId, 'running', msg.description);
       break;
 
@@ -121,10 +123,12 @@ function handleServerMessage(msg) {
       break;
 
     case 'approval_required':
+      removeStatusMessage();
       renderApprovalRequest(msg);
       break;
 
     case 'task_complete':
+      removeStatusMessage();
       renderTaskSummary(msg);
       loadTaskHistory();
       break;
@@ -138,6 +142,7 @@ function handleServerMessage(msg) {
       break;
 
     case 'replan_complete':
+      removeStatusMessage();
       if (msg.newSteps) {
         appendNewStepsToPlan(msg.taskId, msg.newSteps);
       }
@@ -148,6 +153,7 @@ function handleServerMessage(msg) {
       break;
 
     case 'error':
+      removeStatusMessage();
       renderErrorMessage(msg.message);
       break;
 
@@ -181,6 +187,7 @@ function showMessages() {
 }
 
 function addUserMessage(text) {
+  removeStatusMessage();
   showMessages();
   const div = document.createElement('div');
   div.className = 'message user';
@@ -369,7 +376,19 @@ function renderTaskSummary(msg) {
   scrollToBottom();
 }
 
+let currentStatusEl = null;
+
+function removeStatusMessage() {
+  if (currentStatusEl && currentStatusEl.parentNode) {
+    currentStatusEl.remove();
+  }
+  currentStatusEl = null;
+  const orphans = messagesContainer.querySelectorAll('.status-message');
+  orphans.forEach(el => el.remove());
+}
+
 function renderStatusMessage(text, status) {
+  removeStatusMessage();
   const div = document.createElement('div');
   div.className = 'status-message';
   if (status === 'planning' || status === 'summarizing' || status === 'replanning') {
@@ -377,6 +396,7 @@ function renderStatusMessage(text, status) {
   } else {
     div.textContent = text;
   }
+  currentStatusEl = div;
   messagesContainer.appendChild(div);
   scrollToBottom();
 }

@@ -130,20 +130,31 @@ export async function click(selector) {
  * @param {string} text - Text to type
  * @returns {Promise<Object>} - Type result
  */
-export async function type(selector, text) {
+export async function type(selector, text, pressEnter = false) {
   ensurePage();
   try {
     try {
       await activePage.fill(selector, text, { timeout: 5000 });
+      if (pressEnter || selector.toLowerCase().includes('search') || selector.toLowerCase().includes('q')) {
+        await activePage.press(selector, 'Enter').catch(() => {});
+      }
       return { success: true, method: 'css', selector };
     } catch {
       // Try placeholder/label text
-      await activePage.getByPlaceholder(selector, { exact: false }).first().fill(text, { timeout: 5000 });
+      const el = activePage.getByPlaceholder(selector, { exact: false }).first();
+      await el.fill(text, { timeout: 5000 });
+      if (pressEnter || selector.toLowerCase().includes('search')) {
+        await el.press('Enter').catch(() => {});
+      }
       return { success: true, method: 'placeholder', selector };
     }
   } catch (err) {
     try {
-      await activePage.getByLabel(selector, { exact: false }).first().fill(text, { timeout: 3000 });
+      const el = activePage.getByLabel(selector, { exact: false }).first();
+      await el.fill(text, { timeout: 3000 });
+      if (pressEnter || selector.toLowerCase().includes('search')) {
+        await el.press('Enter').catch(() => {});
+      }
       return { success: true, method: 'label', selector };
     } catch {
       return { success: false, error: `Could not find input: ${selector}. ${err.message}` };
