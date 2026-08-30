@@ -130,16 +130,17 @@ export async function navigate(url, taskId) {
     url = 'https://' + url;
   }
 
-  // 1. Open immediately in Windows default browser to guarantee visible foreground display
+  // 1. Open immediately in a dedicated NEW BROWSER WINDOW to guarantee physical foreground appearance
   try {
     const { exec } = await import('child_process');
-    exec(`powershell.exe -NoProfile -Command "Start-Process '${url}'"`);
+    const launchScript = `try { Start-Process chrome.exe -ArgumentList '--new-window', '${url}' -ErrorAction Stop } catch { try { Start-Process msedge.exe -ArgumentList '--new-window', '${url}' -ErrorAction Stop } catch { Start-Process '${url}' } }`;
+    exec(`powershell.exe -NoProfile -Command "${launchScript}"`);
     setTimeout(() => {
       focusWindow('chrome').catch(() => {});
       focusWindow('msedge').catch(() => {});
       focusWindow('brave').catch(() => {});
       focusWindow('firefox').catch(() => {});
-    }, 250);
+    }, 400);
   } catch {}
 
   // 2. Concurrently load in Playwright engine for automated interactions

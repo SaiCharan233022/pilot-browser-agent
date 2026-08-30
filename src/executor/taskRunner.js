@@ -246,7 +246,10 @@ export async function runTask(command, options = {}) {
   const systemActionSet = ['media_control', 'app_launch', 'app_close', 'open_and_play', 'desktop_focus', 'desktop_type', 'desktop_key'];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
-  if (isAllSystemActions && task.completedSteps.length > 0) {
+  if (plan.steps.length === 1 && plan.steps[0].action === 'navigate' && task.completedSteps.length > 0) {
+    const targetUrl = plan.steps[0].url;
+    summary = `🌐 **Opened in your browser:** [${targetUrl}](${targetUrl})`;
+  } else if (isAllSystemActions && task.completedSteps.length > 0) {
     const lastStep = task.completedSteps[task.completedSteps.length - 1];
     if (lastStep.action === 'media_control') {
       const act = lastStep.mediaAction || 'media action';
