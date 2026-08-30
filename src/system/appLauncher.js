@@ -164,24 +164,160 @@ const APP_REGISTRY = {
     processPatterns: ['chrome', 'msedge'],
     execNames: ['chrome.exe'],
   },
-  'x': {
-    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://x.com\'"',
+  // AI Platforms & Web Applications
+  'gemini': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://gemini.google.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'google gemini': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://gemini.google.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'gamma': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://gamma.app\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'gamma ai': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://gamma.app\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'gamma.app': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://gamma.app\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'perplexity': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.perplexity.ai\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'perplexity ai': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.perplexity.ai\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'claude': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://claude.ai\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'claude ai': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://claude.ai\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'deepseek': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://chat.deepseek.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'deepseek ai': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://chat.deepseek.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'huggingface': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://huggingface.co\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'leetcode': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://leetcode.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'canva': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.canva.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'figma': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.figma.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'notion': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.notion.so\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'stackoverflow': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://stackoverflow.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'wikipedia': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.wikipedia.org\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'amazon': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.amazon.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'flipkart': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.flipkart.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'linkedin': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.linkedin.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'google': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.google.com\'"',
+    processPatterns: ['chrome', 'msedge'],
+    execNames: ['chrome.exe'],
+  },
+  'bing': {
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process \'https://www.bing.com\'"',
     processPatterns: ['chrome', 'msedge'],
     execNames: ['chrome.exe'],
   },
 };
 
 /**
- * Launch an application visibly.
+ * Resolve any application, service name, or arbitrary URL to a launch command.
+ */
+function resolveAppOrWebCommand(name) {
+  if (!name) return 'powershell.exe -NoProfile -Command "Start-Process \'https://www.google.com\'"';
+  const clean = name.trim().toLowerCase();
+  
+  if (APP_REGISTRY[clean]) return APP_REGISTRY[clean].launchCmd;
+
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return `powershell.exe -NoProfile -Command "Start-Process '${clean}'"`;
+  }
+
+  if (/\.[a-z]{2,}(\/.*)?$/i.test(clean)) {
+    return `powershell.exe -NoProfile -Command "Start-Process 'https://${clean}'"`;
+  }
+
+  const strippedAi = clean.replace(/\s+(ai|app)$/i, '');
+  if (APP_REGISTRY[strippedAi]) return APP_REGISTRY[strippedAi].launchCmd;
+  if (clean.endsWith(' ai')) {
+    return `powershell.exe -NoProfile -Command "Start-Process 'https://${strippedAi}.ai' -ErrorAction SilentlyContinue; if (!$?) { Start-Process 'https://www.${strippedAi}.com' }"`;
+  }
+
+  const sanitizedWord = clean.replace(/[^a-z0-9-]/g, '');
+  return `powershell.exe -NoProfile -Command "Start-Process 'https://www.${sanitizedWord}.com' -ErrorAction SilentlyContinue; if (!$?) { Start-Process 'https://${sanitizedWord}.ai' }"`;
+}
+
+/**
+ * Launch an application or website visibly in foreground.
  */
 export async function launchApp(appName) {
-  const normalized = (appName || '').trim().toLowerCase();
-  const entry = APP_REGISTRY[normalized];
-  const launchCmd = entry ? entry.launchCmd : `cmd.exe /c start "" "${appName}"`;
+  const launchCmd = resolveAppOrWebCommand(appName);
 
   try {
     await execAsync(launchCmd);
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 400));
 
     return {
       success: true,
