@@ -85,12 +85,16 @@ export async function runTask(command, options = {}) {
     })),
   });
 
-  // === LAUNCH BROWSER ===
-  if (!browser.isRunning()) {
+  // === LAUNCH BROWSER (ONLY WHEN NEEDED) ===
+  const needsBrowser = plan.steps.some(s => [
+    'navigate', 'click', 'type', 'screenshot_and_extract', 'scroll', 'wait', 'select', 'extract_text', 'go_back'
+  ].includes(s.action));
+
+  if (needsBrowser && !browser.isRunning()) {
     broadcast({ type: 'browser_status', status: 'launching' });
     try {
       await browser.launch({
-        headless: options.headless ?? true,
+        headless: options.headless ?? (process.env.HEADLESS === 'true'),
         profilePath: options.profilePath,
       });
       broadcast({ type: 'browser_status', status: 'open' });

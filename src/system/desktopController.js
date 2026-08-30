@@ -32,10 +32,9 @@ export async function focusWindow(appName) {
  */
 export async function typeDesktopText(text, targetApp = '') {
   try {
-    // Escape special SendKeys characters: +, ^, %, ~, (, ), {, }
-    const sanitized = (text || '').replace(/([+^%~(){}[\]])/g, '{$1}');
-    const cmd = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${DESKTOP_BRIDGE_SCRIPT}" -Action type -Target "${targetApp}" -Text "${sanitized}"`;
-    await execAsync(cmd);
+    const base64Text = Buffer.from(text || '', 'utf-8').toString('base64');
+    const psCmd = `$text = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${base64Text}')); $target = '${targetApp}'; if ($target) { $ws = New-Object -ComObject WScript.Shell; $ws.AppActivate($target) | Out-Null; Start-Sleep -Milliseconds 400 }; Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($text)`;
+    await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "${psCmd}"`);
     return { success: true, text, message: `Typed "${text}" into ${targetApp || 'application'}.` };
   } catch (err) {
     return { success: false, text, error: err.message };
