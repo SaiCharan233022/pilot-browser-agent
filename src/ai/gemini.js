@@ -4,6 +4,8 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import dns from 'dns';
+try { dns.setDefaultResultOrder('ipv4first'); } catch {}
 import {
   PLANNER_SYSTEM_PROMPT,
   VISION_ANALYSIS_PROMPT,
@@ -17,8 +19,9 @@ let currentApiKey = null;
 let workingModelName = null;
 const MODEL_CANDIDATES = [
   'gemini-3.5-flash-lite',
-  'gemini-3.6-flash',
   'gemini-3.5-flash',
+  'gemini-3.6-flash',
+  'gemini-flash-latest',
 ];
 
 /**

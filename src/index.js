@@ -4,6 +4,8 @@
  */
 
 import 'dotenv/config';
+import dns from 'dns';
+try { dns.setDefaultResultOrder('ipv4first'); } catch {}
 import { createAppServer } from './server/index.js';
 import { initGemini } from './ai/gemini.js';
 import { initDatabase } from './storage/history.js';
