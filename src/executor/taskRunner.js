@@ -238,14 +238,26 @@ export async function runTask(command, options = {}) {
   }
 
   // === SUMMARIZATION PHASE ===
-  broadcast({ type: 'status', status: 'summarizing', message: 'Formatting final output...', taskId: plan.taskId });
-
   let summary = '';
-  try {
-    summary = await summarizeTask(command, task.completedSteps, task.extractedData);
-  } catch (err) {
-    console.error('Summary generation failed:', err);
-    summary = task.extractedData.map(d => d.data).join('\n\n') || `Task completed successfully.`;
+  const isAllSystemActions = plan.steps.every(s => ['media_control', 'app_launch', 'app_close'].includes(s.action));
+
+  if (isAllSystemActions && task.completedSteps.length > 0) {
+    const lastStep = task.completedSteps[task.completedSteps.length - 1];
+    if (lastStep.action === 'media_control') {
+      const act = lastStep.mediaAction || 'media action';
+      summary = lastStep.amount != null ? `System volume set to ${lastStep.amount}%.` : `Media action (${act}) executed successfully.`;
+    } else if (lastStep.action === 'app_launch') {
+      summary = `Launched ${lastStep.appName || 'application'}.`;
+    } else if (lastStep.action === 'app_close') {
+      summary = `Closed ${lastStep.appName || 'application'}.`;
+    }
+  } else {
+    broadcast({ type: 'status', status: 'summarizing', message: 'Formatting final output...', taskId: plan.taskId });
+    try {
+      summary = await summarizeTask(command, task.completedSteps, task.extractedData);
+    } catch (err) {
+      summary = task.extractedData.map(d => d.data).join('\n\n') || `Task completed successfully.`;
+    }
   }
 
   // === COMPLETION ===

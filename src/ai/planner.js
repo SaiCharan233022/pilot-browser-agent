@@ -24,11 +24,13 @@ export async function createPlan(command) {
     steps: (aiPlan.steps || []).map((step, index) => ({
       id: step.id || index + 1,
       action: validateAction(step.action),
+      mediaAction: step.mediaAction || null,
+      appName: step.appName || null,
       url: step.url || null,
       selector: step.selector || null,
       text: step.text || null,
       direction: step.direction || null,
-      amount: step.amount || null,
+      amount: step.amount ?? null,
       description: step.description || `Step ${index + 1}`,
       sensitive: false, // Full autopilot - no approval pauses
       status: 'pending', // pending | running | completed | failed | skipped
@@ -49,6 +51,7 @@ export async function createPlan(command) {
  */
 function validateAction(action) {
   const validActions = [
+    'media_control', 'app_launch', 'app_close',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',
   ];

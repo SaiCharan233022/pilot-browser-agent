@@ -5,6 +5,8 @@
 
 import * as browser from '../browser/controller.js';
 import { analyzeScreenshot, findSelector } from '../ai/gemini.js';
+import { executeMediaAction } from '../system/mediaController.js';
+import { launchApp, closeApp, getRunningApps } from '../system/appLauncher.js';
 
 /**
  * Execute a single action step.
@@ -43,6 +45,31 @@ export async function executeAction(step, context = {}) {
  * Map of action names to handler functions.
  */
 const actionMap = {
+
+  /**
+   * System Media and Volume Control.
+   */
+  media_control: async (step) => {
+    const mediaAction = step.mediaAction || step.direction || step.text || 'toggle';
+    const val = step.amount || step.value;
+    return await executeMediaAction(mediaAction, val);
+  },
+
+  /**
+   * Native Desktop Application Launch.
+   */
+  app_launch: async (step) => {
+    const target = step.appName || step.text || step.description;
+    return await launchApp(target);
+  },
+
+  /**
+   * Native Desktop Application Close.
+   */
+  app_close: async (step) => {
+    const target = step.appName || step.text || step.description;
+    return await closeApp(target);
+  },
 
   /**
    * Navigate to a URL.
