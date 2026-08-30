@@ -1,6 +1,6 @@
 /**
  * Task Runner — orchestrates the complete lifecycle of a browser automation task.
- * Implements a state machine: Planning → Executing → WaitingForApproval → Summarizing → Completed
+ * High-speed autonomous execution.
  */
 
 import { createPlan } from '../ai/planner.js';
@@ -11,9 +11,6 @@ import { saveTask, saveStep, updateTaskStatus } from '../storage/history.js';
 
 // Active tasks (keyed by taskId)
 const activeTasks = new Map();
-
-// Approval callbacks (keyed by `taskId:stepId`)
-const pendingApprovals = new Map();
 
 /**
  * Set the WebSocket broadcast function.
@@ -35,7 +32,7 @@ function broadcast(message) {
  */
 export async function runTask(command, options = {}) {
   // === PLANNING PHASE ===
-  broadcast({ type: 'status', status: 'planning', message: 'Breaking down your task...' });
+  broadcast({ type: 'status', status: 'planning', message: 'Processing your request...' });
 
   let plan;
   try {
@@ -43,6 +40,24 @@ export async function runTask(command, options = {}) {
   } catch (err) {
     broadcast({ type: 'error', message: `Failed to create plan: ${err.message}` });
     return { success: false, error: err.message };
+  }
+
+  // If this is a direct conversational message (0 steps)
+  if (!plan.steps || plan.steps.length === 0) {
+    plan.status = 'completed';
+    plan.completedAt = new Date().toISOString();
+    saveTask(plan);
+    updateTaskStatus(plan.taskId, 'completed', plan.summary);
+
+    broadcast({
+      type: 'task_complete',
+      taskId: plan.taskId,
+      summary: plan.summary,
+      stepsCompleted: 0,
+      totalSteps: 0,
+      extractedData: [],
+    });
+    return { success: true, taskId: plan.taskId, summary: plan.summary };
   }
 
   // Save task to history
@@ -66,7 +81,6 @@ export async function runTask(command, options = {}) {
       id: s.id,
       action: s.action,
       description: s.description,
-      sensitive: s.sensitive,
       status: s.status,
     })),
   });
@@ -114,51 +128,7 @@ export async function runTask(command, options = {}) {
       description: step.description,
     });
 
-    // Check if this is a sensitive action requiring approval
-    if (step.sensitive || step.action === 'confirm') {
-      task.status = 'paused';
-      broadcast({
-        type: 'approval_required',
-        taskId: plan.taskId,
-        stepId: step.id,
-        description: step.description,
-      });
-
-      // Wait for user approval
-      const approved = await waitForApproval(plan.taskId, step.id);
-
-      if (!approved) {
-        step.status = 'skipped';
-        broadcast({
-          type: 'step_skipped',
-          taskId: plan.taskId,
-          stepId: step.id,
-          description: step.description,
-        });
-        saveStep(plan.taskId, step);
-        continue;
-      }
-
-      task.status = 'running';
-
-      // For confirm-only actions, just mark as complete and continue
-      if (step.action === 'confirm') {
-        step.status = 'completed';
-        step.result = { approved: true };
-        broadcast({
-          type: 'step_complete',
-          taskId: plan.taskId,
-          stepId: step.id,
-          description: step.description,
-          result: 'User approved',
-        });
-        task.completedSteps.push(step);
-        saveStep(plan.taskId, step);
-        continue;
-      }
-    }
-
-    // Execute the action
+    // Execute the action directly (no approval pauses)
     const actionResult = await executeAction(step, {
       taskId: plan.taskId,
       task: command,
@@ -174,6 +144,11 @@ export async function runTask(command, options = {}) {
         task.extractedData.push({
           stepId: step.id,
           data: actionResult.result.extractedData,
+        });
+      } else if (actionResult.result?.extractedText) {
+        task.extractedData.push({
+          stepId: step.id,
+          data: actionResult.result.extractedText,
         });
       }
 
@@ -222,7 +197,7 @@ export async function runTask(command, options = {}) {
         if (newPlan.abort) {
           broadcast({
             type: 'error',
-            message: `Task aborted: ${newPlan.abortReason}`,
+            message: `Task ended: ${newPlan.abortReason}`,
             taskId: plan.taskId,
           });
           updateTaskStatus(plan.taskId, 'failed');
@@ -241,7 +216,6 @@ export async function runTask(command, options = {}) {
             timestamp: null,
           }));
 
-          // Remove remaining old steps, add new ones
           plan.steps = [...plan.steps.slice(0, i + 1), ...newSteps];
 
           broadcast({
@@ -251,32 +225,27 @@ export async function runTask(command, options = {}) {
               id: s.id,
               action: s.action,
               description: s.description,
-              sensitive: s.sensitive,
               status: s.status,
             })),
           });
         }
       } catch (replanErr) {
         console.error('Re-planning failed:', replanErr);
-        // Continue with remaining steps anyway
       }
     }
 
     saveStep(plan.taskId, step);
-
-    // Small delay between steps to avoid overwhelming pages
-    await new Promise(resolve => setTimeout(resolve, 500));
   }
 
   // === SUMMARIZATION PHASE ===
-  broadcast({ type: 'status', status: 'summarizing', message: 'Generating summary...', taskId: plan.taskId });
+  broadcast({ type: 'status', status: 'summarizing', message: 'Formatting final output...', taskId: plan.taskId });
 
   let summary = '';
   try {
     summary = await summarizeTask(command, task.completedSteps, task.extractedData);
   } catch (err) {
     console.error('Summary generation failed:', err);
-    summary = `Task completed. ${task.completedSteps.length}/${plan.steps.length} steps succeeded.`;
+    summary = task.extractedData.map(d => d.data).join('\n\n') || `Task completed successfully.`;
   }
 
   // === COMPLETION ===
@@ -305,53 +274,14 @@ export async function runTask(command, options = {}) {
 }
 
 /**
- * Wait for user approval of a sensitive action.
- * Returns a promise that resolves when the user approves or rejects.
+ * Approve a pending action (retained for API compatibility).
  */
-function waitForApproval(taskId, stepId) {
-  return new Promise((resolve) => {
-    const key = `${taskId}:${stepId}`;
-    pendingApprovals.set(key, resolve);
-
-    // Auto-timeout after 5 minutes
-    setTimeout(() => {
-      if (pendingApprovals.has(key)) {
-        pendingApprovals.delete(key);
-        resolve(false); // Auto-reject
-        broadcast({
-          type: 'approval_timeout',
-          taskId,
-          stepId,
-          message: 'Approval timed out after 5 minutes. Step skipped.',
-        });
-      }
-    }, 5 * 60 * 1000);
-  });
-}
+export function approveAction() {}
 
 /**
- * Approve a pending action.
+ * Reject/cancel a pending action (retained for API compatibility).
  */
-export function approveAction(taskId, stepId) {
-  const key = `${taskId}:${stepId}`;
-  const resolve = pendingApprovals.get(key);
-  if (resolve) {
-    pendingApprovals.delete(key);
-    resolve(true);
-  }
-}
-
-/**
- * Reject/cancel a pending action.
- */
-export function rejectAction(taskId, stepId) {
-  const key = `${taskId}:${stepId}`;
-  const resolve = pendingApprovals.get(key);
-  if (resolve) {
-    pendingApprovals.delete(key);
-    resolve(false);
-  }
-}
+export function rejectAction() {}
 
 /**
  * Cancel a running task.
@@ -369,10 +299,9 @@ export function cancelTask(taskId) {
 function summarizeStepResult(result) {
   if (!result) return 'Completed';
   if (result.error) return `Error: ${result.error}`;
-  if (result.extractedData) return result.extractedData;
-  if (result.extractedText) return result.extractedText.substring(0, 500);
-  if (result.pageDescription) return result.pageDescription;
-  if (result.url) return `Navigated to: ${result.url}`;
-  if (result.success) return 'Completed successfully';
-  return JSON.stringify(result).substring(0, 200);
+  if (result.extractedData) return typeof result.extractedData === 'string' ? result.extractedData : JSON.stringify(result.extractedData);
+  if (result.extractedText) return result.extractedText.substring(0, 300);
+  if (result.url) return `Loaded: ${result.url}`;
+  if (result.success) return 'Done';
+  return 'Done';
 }

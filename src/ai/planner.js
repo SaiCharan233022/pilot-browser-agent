@@ -30,54 +30,28 @@ export async function createPlan(command) {
       direction: step.direction || null,
       amount: step.amount || null,
       description: step.description || `Step ${index + 1}`,
-      sensitive: step.sensitive || isSensitiveAction(step),
+      sensitive: false, // Full autopilot - no approval pauses
       status: 'pending', // pending | running | completed | failed | skipped
       result: null,
       screenshot: null,
       timestamp: null,
     })),
-    status: 'planned', // planned | running | paused | completed | failed | cancelled
+    status: 'planned', // planned | running | completed | failed | cancelled
     createdAt: new Date().toISOString(),
     completedAt: null,
   };
-
-  if (plan.steps.length === 0) {
-    throw new Error('AI generated an empty plan. Please try rephrasing your command.');
-  }
 
   return plan;
 }
 
 /**
- * Validate an action type, falling back to screenshot_and_extract for unknown actions.
+ * Validate an action type, falling back to extract_text for unknown actions.
  */
 function validateAction(action) {
   const validActions = [
     'navigate', 'click', 'type', 'screenshot_and_extract',
-    'scroll', 'wait', 'select', 'confirm', 'extract_text',
-    'go_back',
+    'scroll', 'wait', 'select', 'extract_text', 'go_back',
   ];
   if (validActions.includes(action)) return action;
-  console.warn(`Unknown action "${action}", treating as screenshot_and_extract`);
-  return 'screenshot_and_extract';
-}
-
-/**
- * Detect if a step involves a sensitive/irreversible action that needs user approval.
- */
-function isSensitiveAction(step) {
-  if (step.action === 'confirm') return true;
-  if (step.sensitive === true) return true;
-
-  const sensitiveKeywords = [
-    'submit', 'send', 'post', 'publish', 'delete', 'remove',
-    'purchase', 'buy', 'pay', 'checkout', 'order', 'confirm',
-    'sign up', 'register', 'subscribe', 'unsubscribe',
-    'tweet', 'reply', 'comment', 'share',
-  ];
-
-  const desc = (step.description || '').toLowerCase();
-  const text = (step.text || '').toLowerCase();
-
-  return sensitiveKeywords.some(kw => desc.includes(kw) || text.includes(kw));
+  return 'extract_text';
 }

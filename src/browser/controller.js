@@ -88,8 +88,8 @@ export async function navigate(url) {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
-    await activePage.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await activePage.waitForTimeout(1000); // Let page settle
+    await activePage.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await activePage.waitForTimeout(200);
     return { success: true, url: activePage.url(), title: await activePage.title() };
   } catch (err) {
     return { success: false, error: err.message };

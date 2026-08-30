@@ -338,23 +338,32 @@ function renderTaskSummary(msg) {
   div.className = 'message agent';
 
   // Convert markdown-like formatting to HTML
-  const summaryHtml = markdownToHtml(msg.summary || 'Task completed.');
+  const summaryHtml = markdownToHtml(msg.summary || 'Completed.');
 
-  div.innerHTML = `
-    <div class="message-body">
-      <div class="summary-card">
-        <div class="summary-header">
-          <span>✅</span>
-          <h3>Task Complete</h3>
+  if (!msg.totalSteps || msg.totalSteps === 0) {
+    div.innerHTML = `
+      <div class="message-body">
+        <div class="message-header">
+          <div class="message-avatar">🧭</div>
+          <span class="message-sender">Pilot</span>
+          <span class="message-time">${formatTime()}</span>
         </div>
-        <div class="summary-body">${summaryHtml}</div>
-        <div class="summary-stats">
-          <span>📊 ${msg.stepsCompleted}/${msg.totalSteps} steps completed</span>
-          <span>🕐 ${formatTime()}</span>
+        <div class="direct-response">${summaryHtml}</div>
+      </div>
+    `;
+  } else {
+    div.innerHTML = `
+      <div class="message-body">
+        <div class="summary-card">
+          <div class="summary-header">
+            <span>⚡</span>
+            <h3>Result</h3>
+          </div>
+          <div class="summary-body">${summaryHtml}</div>
         </div>
       </div>
-    </div>
-  `;
+    `;
+  }
 
   messagesContainer.appendChild(div);
   scrollToBottom();
