@@ -179,8 +179,8 @@ export async function runTask(command, options = {}) {
       });
 
       try {
-        const pageInfo = await browser.getPageInfo();
-        const replanScreenshot = await browser.screenshot();
+        const pageInfo = await browser.getPageInfo(plan.taskId);
+        const replanScreenshot = await browser.screenshot(null, plan.taskId);
 
         const newPlan = await replan({
           originalTask: command,

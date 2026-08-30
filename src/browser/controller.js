@@ -1,7 +1,7 @@
 /**
- * Browser Controller — Ultra High-Speed Playwright Engine.
- * Pre-warmed browser, instant selector resolution, zero artificial delays,
- * and high-speed navigation.
+ * Browser Controller — High-Speed Multi-Tab Playwright Engine.
+ * Supports concurrent tasks, tab isolation, zero artificial delays,
+ * and audio/video playback.
  */
 
 import { chromium } from 'playwright';
@@ -11,18 +11,16 @@ import { getProfilePath, ensureDataDirs, cleanProfileLocks } from './profile.js'
 
 let browserContext = null;
 let activePage = null;
+const taskPages = new Map(); // taskId -> Page
 let isHeadless = false;
 let onStatusChange = null;
 
-/**
- * Set a callback for browser status changes.
- */
 export function setStatusCallback(callback) {
   onStatusChange = callback;
 }
 
 /**
- * Launch or warm-start the browser with optimal speed flags.
+ * Launch or warm-start the browser.
  */
 export async function launch(options = {}) {
   if (browserContext) {
@@ -86,16 +84,56 @@ export async function launch(options = {}) {
 }
 
 /**
+ * Get or create a dedicated tab for a task.
+ */
+export async function getTaskPage(taskId) {
+  if (!browserContext) {
+    await launch({ headless: false });
+  }
+
+  if (taskId && taskPages.has(taskId)) {
+    const existing = taskPages.get(taskId);
+    if (!existing.isClosed()) {
+      return existing;
+    }
+  }
+
+  const pages = browserContext.pages().filter(p => !p.isClosed());
+  let page = null;
+
+  if (pages.length === 1 && pages[0].url() === 'about:blank' && taskPages.size === 0) {
+    page = pages[0];
+  } else if (!taskId && pages.length > 0) {
+    page = pages[0];
+  } else {
+    page = await browserContext.newPage();
+  }
+
+  if (taskId) {
+    taskPages.set(taskId, page);
+    page.on('close', () => taskPages.delete(taskId));
+  }
+
+  activePage = page;
+  try {
+    await page.bringToFront();
+  } catch {}
+
+  return page;
+}
+
+/**
  * High-speed navigation.
  */
-export async function navigate(url) {
-  ensurePage();
+export async function navigate(url, taskId) {
+  const page = await getTaskPage(taskId);
   try {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
-    await activePage.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    return { success: true, url: activePage.url(), title: await activePage.title() };
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    try { await page.bringToFront(); } catch {}
+    return { success: true, url: page.url(), title: await page.title() };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -104,15 +142,15 @@ export async function navigate(url) {
 /**
  * Instant resilient click with multi-tier fast fallback.
  */
-export async function click(selector) {
-  ensurePage();
+export async function click(selector, taskId) {
+  const page = await getTaskPage(taskId);
 
   // 1. Direct CSS locator
   try {
-    const loc = activePage.locator(selector).first();
+    const loc = page.locator(selector).first();
     if (await loc.isVisible({ timeout: 800 }).catch(() => false)) {
       await loc.click({ timeout: 1500 });
-      await ensureMediaPlays();
+      await ensureMediaPlays(page);
       return { success: true, method: 'css', selector };
     }
   } catch { /* proceed */ }
@@ -128,13 +166,15 @@ export async function click(selector) {
       'ytd-rich-item-renderer a#video-title',
       'a[href*="/watch?v="]',
       'ytd-video-renderer h3 a',
+      '[data-testid="play-button"]',
+      'button[aria-label*="Play" i]',
     ];
     for (const v of videoSelectors) {
       try {
-        const loc = activePage.locator(v).first();
+        const loc = page.locator(v).first();
         if (await loc.isVisible({ timeout: 400 }).catch(() => false)) {
           await loc.click({ timeout: 1500 });
-          await ensureMediaPlays();
+          await ensureMediaPlays(page);
           return { success: true, method: 'video-fast-click', selector: v };
         }
       } catch { /* next */ }
@@ -152,7 +192,7 @@ export async function click(selector) {
     ];
     for (const s of searchSelectors) {
       try {
-        const loc = activePage.locator(s).first();
+        const loc = page.locator(s).first();
         if (await loc.isVisible({ timeout: 300 }).catch(() => false)) {
           await loc.click({ timeout: 1200 });
           return { success: true, method: 'search-fast-click', selector: s };
@@ -167,19 +207,19 @@ export async function click(selector) {
 
   if (cleanText && cleanText.length > 1) {
     try {
-      const link = activePage.getByRole('link', { name: cleanText, exact: false }).first();
+      const link = page.getByRole('link', { name: cleanText, exact: false }).first();
       if (await link.isVisible({ timeout: 600 }).catch(() => false)) {
         await link.click({ timeout: 1500 });
-        await ensureMediaPlays();
+        await ensureMediaPlays(page);
         return { success: true, method: 'role-link', text: cleanText };
       }
     } catch { /* next */ }
 
     try {
-      const textEl = activePage.getByText(cleanText, { exact: false }).first();
+      const textEl = page.getByText(cleanText, { exact: false }).first();
       if (await textEl.isVisible({ timeout: 600 }).catch(() => false)) {
         await textEl.click({ timeout: 1500 });
-        await ensureMediaPlays();
+        await ensureMediaPlays(page);
         return { success: true, method: 'get-by-text', text: cleanText };
       }
     } catch { /* next */ }
@@ -187,14 +227,14 @@ export async function click(selector) {
 
   // 5. In-DOM fast evaluation
   try {
-    const clicked = await activePage.evaluate((targetText) => {
+    const clicked = await page.evaluate((targetText) => {
       const links = Array.from(document.querySelectorAll('a, button, [role="button"]'));
       const match = links.find(el => (el.innerText || el.getAttribute('aria-label') || '').toLowerCase().includes(targetText.toLowerCase()));
       if (match) {
         match.click();
         return true;
       }
-      const firstVideo = document.querySelector('a#video-title, ytd-video-renderer a, a[href*="watch"]');
+      const firstVideo = document.querySelector('a#video-title, ytd-video-renderer a, a[href*="watch"], [data-testid="play-button"]');
       if (firstVideo) {
         firstVideo.click();
         return true;
@@ -203,7 +243,7 @@ export async function click(selector) {
     }, cleanText);
 
     if (clicked) {
-      await ensureMediaPlays();
+      await ensureMediaPlays(page);
       return { success: true, method: 'dom-eval-click' };
     }
   } catch { /* proceed */ }
@@ -214,8 +254,8 @@ export async function click(selector) {
 /**
  * Instant typing.
  */
-export async function type(selector, text, pressEnter = true) {
-  ensurePage();
+export async function type(selector, text, pressEnter = true, taskId) {
+  const page = await getTaskPage(taskId);
 
   const isSearchField = selector.toLowerCase().includes('search') || selector.toLowerCase().includes('q') || selector.includes('input');
   const candidateSelectors = [
@@ -225,23 +265,24 @@ export async function type(selector, text, pressEnter = true) {
     'input[name="q"]',
     'textarea[name="q"]',
     'input[type="text"]',
+    '[data-testid="search-input"]',
   ];
 
   for (const s of candidateSelectors) {
     try {
-      const loc = activePage.locator(s).first();
-      if (await loc.isVisible({ timeout: 500 }).catch(() => false)) {
-        await loc.fill(text, { timeout: 1500 });
+      const loc = page.locator(s).first();
+      if (await loc.isVisible({ timeout: 400 }).catch(() => false)) {
+        await loc.fill(text, { timeout: 1200 });
         if (pressEnter || isSearchField) {
           await loc.press('Enter').catch(() => {});
         }
-        return { success: true, method: 'locator-fill', selector: s };
+        return { success: true, selector: s, text };
       }
     } catch { /* next */ }
   }
 
   try {
-    const el = activePage.getByPlaceholder(selector, { exact: false }).first();
+    const el = page.getByPlaceholder(selector, { exact: false }).first();
     await el.fill(text, { timeout: 1500 });
     if (pressEnter || isSearchField) {
       await el.press('Enter').catch(() => {});
@@ -253,12 +294,12 @@ export async function type(selector, text, pressEnter = true) {
 }
 
 /**
- * Instant media unmuting and playback trigger.
+ * Media unmuting and playback trigger.
  */
-async function ensureMediaPlays() {
+async function ensureMediaPlays(page) {
   try {
-    await activePage.evaluate(() => {
-      const videos = document.querySelectorAll('video');
+    await page.evaluate(() => {
+      const videos = document.querySelectorAll('video, audio');
       videos.forEach(v => {
         v.muted = false;
         v.volume = 1.0;
@@ -271,9 +312,9 @@ async function ensureMediaPlays() {
 /**
  * Take a screenshot.
  */
-export async function screenshot(savePath) {
-  ensurePage();
-  const buffer = await activePage.screenshot({ fullPage: false, type: 'png' });
+export async function screenshot(savePath, taskId) {
+  const page = await getTaskPage(taskId);
+  const buffer = await page.screenshot({ fullPage: false, type: 'png' });
 
   if (savePath) {
     const dir = join(process.cwd(), 'data', 'screenshots');
@@ -288,13 +329,13 @@ export async function screenshot(savePath) {
 /**
  * Extract text content.
  */
-export async function extractText(selector) {
-  ensurePage();
+export async function extractText(selector, taskId) {
+  const page = await getTaskPage(taskId);
   try {
     if (selector) {
-      return await activePage.textContent(selector, { timeout: 3000 });
+      return await page.textContent(selector, { timeout: 3000 });
     }
-    return await activePage.evaluate(() => document.body ? document.body.innerText.substring(0, 10000) : '');
+    return await page.evaluate(() => document.body ? document.body.innerText.substring(0, 10000) : '');
   } catch (err) {
     return `Error: ${err.message}`;
   }
@@ -303,21 +344,21 @@ export async function extractText(selector) {
 /**
  * Scroll.
  */
-export async function scroll(direction = 'down', amount = 'page') {
-  ensurePage();
+export async function scroll(direction = 'down', amount = 'page', taskId) {
+  const page = await getTaskPage(taskId);
   const pixels = amount === 'page' ? 700 : parseInt(amount) || 700;
   const delta = direction === 'up' ? -pixels : pixels;
-  await activePage.evaluate((d) => window.scrollBy(0, d), delta);
+  await page.evaluate((d) => window.scrollBy(0, d), delta);
   return { success: true, direction, amount: pixels };
 }
 
 /**
  * Wait for element.
  */
-export async function waitForElement(selector, timeout = 4000) {
-  ensurePage();
+export async function waitForElement(selector, timeout = 4000, taskId) {
+  const page = await getTaskPage(taskId);
   try {
-    await activePage.waitForSelector(selector, { timeout, state: 'visible' });
+    await page.waitForSelector(selector, { timeout, state: 'visible' });
     return { success: true, selector };
   } catch {
     return { success: true, note: `Proceeded after wait` };
@@ -327,10 +368,10 @@ export async function waitForElement(selector, timeout = 4000) {
 /**
  * Select option.
  */
-export async function selectOption(selector, value) {
-  ensurePage();
+export async function selectOption(selector, value, taskId) {
+  const page = await getTaskPage(taskId);
   try {
-    await activePage.selectOption(selector, { label: value }, { timeout: 3000 });
+    await page.selectOption(selector, { label: value }, { timeout: 3000 });
     return { success: true, selector, value };
   } catch {
     return { success: false, error: `Could not select "${value}"` };
@@ -340,11 +381,11 @@ export async function selectOption(selector, value) {
 /**
  * Go back.
  */
-export async function goBack() {
-  ensurePage();
+export async function goBack(taskId) {
+  const page = await getTaskPage(taskId);
   try {
-    await activePage.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 });
-    return { success: true, url: activePage.url() };
+    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 });
+    return { success: true, url: page.url() };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -353,11 +394,11 @@ export async function goBack() {
 /**
  * Page info.
  */
-export async function getPageInfo() {
-  ensurePage();
+export async function getPageInfo(taskId) {
+  const page = await getTaskPage(taskId);
   return {
-    url: activePage.url(),
-    title: await activePage.title(),
+    url: page.url(),
+    title: await page.title(),
   };
 }
 
@@ -373,26 +414,15 @@ export async function close() {
     }
     browserContext = null;
     activePage = null;
+    taskPages.clear();
     onStatusChange?.('closed');
   }
 }
 
-/**
- * Check if running.
- */
 export function isRunning() {
   return browserContext !== null;
 }
 
-/**
- * Toggle headless mode.
- */
 export function setHeadless(headless) {
   isHeadless = headless;
-}
-
-function ensurePage() {
-  if (!activePage || !browserContext) {
-    throw new Error('Browser not ready.');
-  }
 }

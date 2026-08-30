@@ -47,9 +47,9 @@ const actionMap = {
   /**
    * Navigate to a URL.
    */
-  navigate: async (step) => {
+  navigate: async (step, context) => {
     if (!step.url) return { success: false, error: 'No URL provided for navigate action' };
-    return await browser.navigate(step.url);
+    return await browser.navigate(step.url, context.taskId);
   },
 
   /**
@@ -57,9 +57,8 @@ const actionMap = {
    */
   click: async (step, context) => {
     if (!step.selector) {
-      // Try to find the element using AI vision
-      const screenshot = await browser.screenshot();
-      const pageInfo = await browser.getPageInfo();
+      const screenshot = await browser.screenshot(null, context.taskId);
+      const pageInfo = await browser.getPageInfo(context.taskId);
       const selectorResult = await findSelector(step.description, screenshot, pageInfo);
       if (selectorResult.selectors && selectorResult.selectors.length > 0) {
         step.selector = selectorResult.selectors[0].selector;
@@ -67,7 +66,7 @@ const actionMap = {
         return { success: false, error: 'No selector provided and AI could not find the element' };
       }
     }
-    return await browser.click(step.selector);
+    return await browser.click(step.selector, context.taskId);
   },
 
   /**
@@ -76,9 +75,8 @@ const actionMap = {
   type: async (step, context) => {
     if (!step.selector || !step.text) {
       if (!step.text) return { success: false, error: 'No text provided for type action' };
-      // Try to find input using AI
-      const screenshot = await browser.screenshot();
-      const pageInfo = await browser.getPageInfo();
+      const screenshot = await browser.screenshot(null, context.taskId);
+      const pageInfo = await browser.getPageInfo(context.taskId);
       const selectorResult = await findSelector(step.description, screenshot, pageInfo);
       if (selectorResult.selectors && selectorResult.selectors.length > 0) {
         step.selector = selectorResult.selectors[0].selector;
@@ -86,15 +84,15 @@ const actionMap = {
         return { success: false, error: 'No selector provided and AI could not find the input' };
       }
     }
-    return await browser.type(step.selector, step.text);
+    return await browser.type(step.selector, step.text, true, context.taskId);
   },
 
   /**
    * Take a screenshot and analyze it with AI vision.
    */
   screenshot_and_extract: async (step, context) => {
-    const screenshotBuffer = await browser.screenshot();
-    const pageInfo = await browser.getPageInfo();
+    const screenshotBuffer = await browser.screenshot(null, context.taskId);
+    const pageInfo = await browser.getPageInfo(context.taskId);
 
     const analysis = await analyzeScreenshot(screenshotBuffer, {
       url: pageInfo.url,
@@ -116,31 +114,30 @@ const actionMap = {
   /**
    * Scroll the page.
    */
-  scroll: async (step) => {
-    return await browser.scroll(step.direction || 'down', step.amount || 'page');
+  scroll: async (step, context) => {
+    return await browser.scroll(step.direction || 'down', step.amount || 'page', context.taskId);
   },
 
   /**
    * Wait for an element.
    */
-  wait: async (step) => {
+  wait: async (step, context) => {
     if (!step.selector) return { success: true, note: 'No selector, waited briefly' };
-    return await browser.waitForElement(step.selector, 10000);
+    return await browser.waitForElement(step.selector, 4000, context.taskId);
   },
 
   /**
    * Select an option from a dropdown.
    */
-  select: async (step) => {
+  select: async (step, context) => {
     if (!step.selector || !step.text) {
       return { success: false, error: 'Selector and text required for select action' };
     }
-    return await browser.selectOption(step.selector, step.text);
+    return await browser.selectOption(step.selector, step.text, context.taskId);
   },
 
   /**
-   * Confirm action — this is handled by the task runner (pauses for user approval).
-   * This handler just returns a marker that approval is needed.
+   * Confirm action.
    */
   confirm: async (step) => {
     return {
@@ -153,15 +150,15 @@ const actionMap = {
   /**
    * Extract text from the page.
    */
-  extract_text: async (step) => {
-    const text = await browser.extractText(step.selector || null);
+  extract_text: async (step, context) => {
+    const text = await browser.extractText(step.selector || null, context.taskId);
     return { success: true, extractedText: text };
   },
 
   /**
    * Go back to the previous page.
    */
-  go_back: async (step) => {
-    return await browser.goBack();
+  go_back: async (step, context) => {
+    return await browser.goBack(context.taskId);
   },
 };
