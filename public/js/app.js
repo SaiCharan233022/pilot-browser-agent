@@ -1,6 +1,6 @@
 /**
  * Pilot — Frontend Chat Application
- * Handles WebSocket communication, message rendering, and all UI interactions.
+ * Bulletproof, high-speed, and conversational browser automation client.
  */
 
 // === State ===
@@ -9,36 +9,36 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const activePlans = new Map(); // taskId → { steps, element }
 let isFirstMessage = true;
+let currentStatusEl = null;
 
-// === DOM Elements ===
+// === DOM Element Selectors ===
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
-const messagesContainer = $('#messages');
-const welcomeScreen = $('#welcome-screen');
-const commandInput = $('#command-input');
-const sendBtn = $('#btn-send');
-const settingsModal = $('#settings-modal');
-const lightbox = $('#lightbox');
-const lightboxImg = $('#lightbox-img');
-const sidebar = $('#sidebar');
-const taskList = $('#task-list');
-const connectionStatus = $('#connection-status');
-const browserStatus = $('#browser-status');
-
-// === Init ===
-document.addEventListener('DOMContentLoaded', () => {
+// === Safe Init ===
+function init() {
   connectWebSocket();
   setupEventListeners();
   loadSettings();
   loadTaskHistory();
   autoResizeTextarea();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 
 // === WebSocket ===
 function connectWebSocket() {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${protocol}//${location.host}`);
+  try {
+    ws = new WebSocket(`${protocol}//${location.host}`);
+  } catch (e) {
+    console.error('WebSocket init error:', e);
+    return;
+  }
 
   ws.onopen = () => {
     reconnectAttempts = 0;
@@ -73,8 +73,8 @@ function attemptReconnect() {
   }
 
   reconnectAttempts++;
-  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-  updateConnectionStatus('disconnected', `Reconnecting (${reconnectAttempts})...`);
+  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+  updateConnectionStatus('disconnected', `Reconnecting...`);
 
   setTimeout(() => {
     if (!ws || ws.readyState === WebSocket.CLOSED) {
@@ -86,6 +86,13 @@ function attemptReconnect() {
 function send(message) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(message));
+  } else {
+    // If socket is momentarily connecting, wait and send
+    setTimeout(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+      }
+    }, 500);
   }
 }
 
@@ -99,27 +106,42 @@ function handleServerMessage(msg) {
       }
       break;
 
+    case 'status':
+      if (msg.status === 'planning' || msg.status === 'summarizing' || msg.status === 'replanning') {
+        renderStatusMessage(msg.message, msg.status);
+      }
+      break;
+
     case 'plan':
       removeStatusMessage();
-      showMessages();
       renderPlan(msg);
       break;
 
     case 'step_start':
-      removeStatusMessage();
       updateStepStatus(msg.taskId, msg.stepId, 'running', msg.description);
       break;
 
     case 'step_complete':
-      updateStepStatus(msg.taskId, msg.stepId, 'completed', null, msg.result, msg.screenshot);
+      updateStepStatus(
+        msg.taskId,
+        msg.stepId,
+        'completed',
+        msg.description,
+        msg.result,
+        msg.screenshot
+      );
       break;
 
     case 'step_error':
-      updateStepStatus(msg.taskId, msg.stepId, 'failed', null, null, msg.screenshot, msg.error);
-      break;
-
-    case 'step_skipped':
-      updateStepStatus(msg.taskId, msg.stepId, 'skipped');
+      updateStepStatus(
+        msg.taskId,
+        msg.stepId,
+        'failed',
+        msg.description,
+        null,
+        null,
+        msg.error
+      );
       break;
 
     case 'approval_required':
@@ -131,10 +153,6 @@ function handleServerMessage(msg) {
       removeStatusMessage();
       renderTaskSummary(msg);
       loadTaskHistory();
-      break;
-
-    case 'status':
-      renderStatusMessage(msg.message, msg.status);
       break;
 
     case 'replanning':
@@ -167,28 +185,28 @@ function handleServerMessage(msg) {
       }
       break;
 
-    case 'approval_timeout':
-      renderStatusMessage(`⏰ ${msg.message}`, 'warning');
-      break;
-
     default:
-      console.log('Unhandled message:', msg);
+      console.log('Server message:', msg);
   }
 }
 
 // === Rendering Functions ===
 
 function showMessages() {
+  const welcomeScreen = $('#welcome-screen');
+  const messagesContainer = $('#messages');
   if (isFirstMessage) {
     isFirstMessage = false;
-    welcomeScreen.style.display = 'none';
-    messagesContainer.classList.add('active');
+    if (welcomeScreen) welcomeScreen.style.display = 'none';
+    if (messagesContainer) messagesContainer.classList.add('active');
   }
 }
 
 function addUserMessage(text) {
   removeStatusMessage();
   showMessages();
+  const messagesContainer = $('#messages');
+  if (!messagesContainer) return;
   const div = document.createElement('div');
   div.className = 'message user';
   div.innerHTML = `
@@ -200,6 +218,9 @@ function addUserMessage(text) {
 
 function renderPlan(msg) {
   showMessages();
+  const messagesContainer = $('#messages');
+  if (!messagesContainer) return;
+
   let div = msg.taskId ? $(`#msg-${msg.taskId}`) : null;
   if (!div) {
     div = document.createElement('div');
@@ -216,7 +237,7 @@ function renderPlan(msg) {
         <span class="message-time">${formatTime()}</span>
       </div>
       <div class="agent-live-status" id="live-status-${msg.taskId}">
-        <div class="spinner"></div> <span>${escapeHtml(msg.summary || 'Executing task...')}</span>
+        <div class="spinner"></div> <span>${escapeHtml(msg.summary || 'Working on your task...')}</span>
       </div>
     </div>
   `;
@@ -225,7 +246,7 @@ function renderPlan(msg) {
   scrollToBottom();
 }
 
-function updateStepStatus(taskId, stepId, status, description, result, screenshot, error) {
+function updateStepStatus(taskId, stepId, status, description) {
   const statusEl = $(`#live-status-${taskId}`);
   if (statusEl && description) {
     statusEl.innerHTML = `<div class="spinner"></div> <span>${escapeHtml(description)}...</span>`;
@@ -243,6 +264,8 @@ function appendNewStepsToPlan(taskId, newSteps) {
 
 function renderApprovalRequest(msg) {
   removeStatusMessage();
+  const messagesContainer = $('#messages');
+  if (!messagesContainer) return;
   const div = document.createElement('div');
   div.className = 'message agent';
   div.id = `approval-${msg.taskId}-${msg.stepId}`;
@@ -264,6 +287,9 @@ function renderApprovalRequest(msg) {
 
 function renderTaskSummary(msg) {
   removeStatusMessage();
+  const messagesContainer = $('#messages');
+  if (!messagesContainer) return;
+
   let div = msg.taskId ? $(`#msg-${msg.taskId}`) : null;
   if (!div) {
     div = document.createElement('div');
@@ -272,7 +298,6 @@ function renderTaskSummary(msg) {
     messagesContainer.appendChild(div);
   }
 
-  // Convert markdown-like formatting to HTML
   const summaryHtml = markdownToHtml(msg.summary || 'Completed.');
 
   div.innerHTML = `
@@ -288,22 +313,23 @@ function renderTaskSummary(msg) {
 
   scrollToBottom();
 }
-  scrollToBottom();
-}
-
-let currentStatusEl = null;
 
 function removeStatusMessage() {
-  if (currentStatusEl && currentStatusEl.parentNode) {
+  if (currentStatusEl) {
     currentStatusEl.remove();
+    currentStatusEl = null;
   }
-  currentStatusEl = null;
-  const orphans = messagesContainer.querySelectorAll('.status-message');
-  orphans.forEach(el => el.remove());
+  const messagesContainer = $('#messages');
+  if (messagesContainer) {
+    const orphans = messagesContainer.querySelectorAll('.status-message');
+    orphans.forEach(el => el.remove());
+  }
 }
 
 function renderStatusMessage(text, status) {
   removeStatusMessage();
+  const messagesContainer = $('#messages');
+  if (!messagesContainer) return;
   const div = document.createElement('div');
   div.className = 'status-message';
   if (status === 'planning' || status === 'summarizing' || status === 'replanning') {
@@ -318,6 +344,8 @@ function renderStatusMessage(text, status) {
 
 function renderErrorMessage(text) {
   showMessages();
+  const messagesContainer = $('#messages');
+  if (!messagesContainer) return;
   const div = document.createElement('div');
   div.className = 'message agent';
   div.innerHTML = `
@@ -334,6 +362,8 @@ function renderErrorMessage(text) {
 
 function showSetupPrompt() {
   showMessages();
+  const messagesContainer = $('#messages');
+  if (!messagesContainer) return;
   const div = document.createElement('div');
   div.className = 'message agent';
   div.innerHTML = `
@@ -356,9 +386,19 @@ function showSetupPrompt() {
 
 // === Event Listeners ===
 function setupEventListeners() {
-  // Send command
-  sendBtn.addEventListener('click', sendCommand);
-  commandInput.addEventListener('keydown', (e) => {
+  const sendBtn = $('#btn-send');
+  const commandInput = $('#command-input');
+  const settingsModal = $('#settings-modal');
+  const sidebar = $('#sidebar');
+
+  // Send button click
+  sendBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    sendCommand();
+  });
+
+  // Enter key in textarea
+  commandInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendCommand();
@@ -368,38 +408,49 @@ function setupEventListeners() {
   // Example buttons
   $$('.example-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      commandInput.value = btn.dataset.command;
+      if (commandInput) commandInput.value = btn.dataset.command;
       sendCommand();
     });
   });
 
   // Settings modal
-  $('#btn-settings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
-  $('#btn-close-settings').addEventListener('click', () => settingsModal.classList.add('hidden'));
-  $('.modal-overlay').addEventListener('click', () => settingsModal.classList.add('hidden'));
+  $('#btn-settings')?.addEventListener('click', () => settingsModal?.classList.remove('hidden'));
+  $('#btn-close-settings')?.addEventListener('click', () => settingsModal?.classList.add('hidden'));
+  $('.modal-overlay')?.addEventListener('click', () => settingsModal?.classList.add('hidden'));
 
   // API key save
-  $('#btn-save-key').addEventListener('click', saveApiKey);
+  $('#btn-save-key')?.addEventListener('click', saveApiKey);
+
+  // Headless toggle
+  $('#headless-toggle')?.addEventListener('change', (e) => {
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ headless: e.target.checked }),
+    });
+  });
 
   // Sidebar
-  $('#btn-history').addEventListener('click', () => {
-    sidebar.classList.toggle('hidden');
+  $('#btn-history')?.addEventListener('click', () => {
+    sidebar?.classList.toggle('hidden');
     loadTaskHistory();
   });
-  $('#btn-close-sidebar').addEventListener('click', () => sidebar.classList.add('hidden'));
+  $('#btn-close-sidebar')?.addEventListener('click', () => sidebar?.classList.add('hidden'));
 
   // Lightbox
-  $('#btn-close-lightbox').addEventListener('click', closeLightbox);
-  $('.lightbox-overlay').addEventListener('click', closeLightbox);
+  $('#btn-close-lightbox')?.addEventListener('click', closeLightbox);
+  $('.lightbox-overlay')?.addEventListener('click', closeLightbox);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeLightbox();
-      settingsModal.classList.add('hidden');
+      settingsModal?.classList.add('hidden');
     }
   });
 }
 
 function sendCommand() {
+  const commandInput = $('#command-input');
+  if (!commandInput) return;
   const text = commandInput.value.trim();
   if (!text) return;
 
@@ -407,29 +458,8 @@ function sendCommand() {
   send({ type: 'command', text });
   commandInput.value = '';
   commandInput.style.height = 'auto';
+  commandInput.focus();
 }
-
-// === Approval ===
-window.handleApproval = function(taskId, stepId, approved) {
-  send({
-    type: approved ? 'approve' : 'reject',
-    taskId,
-    stepId,
-  });
-
-  // Remove approval card
-  const el = $(`#approval-${taskId}-${stepId}`);
-  if (el) {
-    el.style.opacity = '0.5';
-    el.querySelector('.approval-actions')?.remove();
-    const status = document.createElement('div');
-    status.style.marginTop = 'var(--space-sm)';
-    status.style.fontSize = '12px';
-    status.style.color = approved ? 'var(--success)' : 'var(--text-tertiary)';
-    status.textContent = approved ? '✅ Approved' : '⏭️ Skipped';
-    el.querySelector('.approval-card')?.appendChild(status);
-  }
-};
 
 // === Settings ===
 async function loadSettings() {
@@ -439,43 +469,50 @@ async function loadSettings() {
 
     if (settings.hasApiKey) {
       const keyStatus = $('#key-status');
-      keyStatus.textContent = '✅ API key configured';
-      keyStatus.className = 'setting-status success';
+      if (keyStatus) {
+        keyStatus.textContent = '✅ API key configured';
+        keyStatus.className = 'setting-status success';
+      }
     }
 
-    $('#headless-toggle').checked = settings.headless;
+    const toggle = $('#headless-toggle');
+    if (toggle) toggle.checked = !!settings.headless;
   } catch (err) {
     console.error('Failed to load settings:', err);
   }
 }
 
 function saveApiKey() {
-  const key = $('#api-key-input').value.trim();
+  const keyInput = $('#api-key-input');
+  if (!keyInput) return;
+  const key = keyInput.value.trim();
   if (!key) return;
 
   send({ type: 'set_api_key', apiKey: key });
 
   const keyStatus = $('#key-status');
-  keyStatus.textContent = '⏳ Saving...';
-  keyStatus.className = 'setting-status';
+  if (keyStatus) {
+    keyStatus.textContent = '⏳ Saving...';
+    keyStatus.className = 'setting-status';
+    setTimeout(() => {
+      keyStatus.textContent = '✅ API key saved!';
+      keyStatus.className = 'setting-status success';
+    }, 500);
+  }
 
-  // Clear input
-  $('#api-key-input').value = '';
-
-  // Update status after a moment
-  setTimeout(() => {
-    keyStatus.textContent = '✅ API key saved!';
-    keyStatus.className = 'setting-status success';
-  }, 500);
+  keyInput.value = '';
 }
 
 // === Task History ===
 async function loadTaskHistory() {
+  const taskList = $('#task-list');
+  if (!taskList) return;
+
   try {
     const res = await fetch('/api/tasks');
     const { tasks } = await res.json();
 
-    taskList.innerHTML = tasks.length === 0
+    taskList.innerHTML = (!tasks || tasks.length === 0)
       ? '<div style="padding: 20px; text-align: center; color: var(--text-tertiary); font-size: 13px;">No tasks yet. Type a command to get started!</div>'
       : tasks.map(task => `
           <div class="task-item" onclick="loadTaskDetail('${task.id}')">
@@ -495,14 +532,11 @@ window.loadTaskDetail = async function(taskId) {
   try {
     const res = await fetch(`/api/tasks/${taskId}`);
     const { task } = await res.json();
+    if (!task) return;
 
     showMessages();
-
-    // Clear current messages and render the historical task
-    // Add user command
     addUserMessage(task.command);
 
-    // Add summary if available
     if (task.ai_summary) {
       renderTaskSummary({
         summary: task.ai_summary,
@@ -517,43 +551,57 @@ window.loadTaskDetail = async function(taskId) {
 
 // === Lightbox ===
 function openLightbox(src) {
-  lightboxImg.src = src;
-  lightbox.classList.remove('hidden');
+  const lightbox = $('#lightbox');
+  const lightboxImg = $('#lightbox-img');
+  if (lightboxImg) lightboxImg.src = src;
+  if (lightbox) lightbox.classList.remove('hidden');
 }
 
 function closeLightbox() {
-  lightbox.classList.add('hidden');
-  lightboxImg.src = '';
+  const lightbox = $('#lightbox');
+  const lightboxImg = $('#lightbox-img');
+  if (lightbox) lightbox.classList.add('hidden');
+  if (lightboxImg) lightboxImg.src = '';
 }
 
 // === UI Helpers ===
 function updateConnectionStatus(status, text) {
+  const connectionStatus = $('#connection-status');
+  if (!connectionStatus) return;
   const dot = connectionStatus.querySelector('.status-dot');
   const label = connectionStatus.querySelector('.status-text');
-  dot.className = `status-dot ${status === 'connected' ? 'connected' : status === 'error' ? 'error' : ''}`;
-  label.textContent = text;
+  if (dot) dot.className = `status-dot ${status === 'connected' ? 'connected' : status === 'error' ? 'error' : ''}`;
+  if (label) label.textContent = text;
 }
 
 function updateBrowserStatus(status) {
+  const browserStatus = $('#browser-status');
+  if (!browserStatus) return;
   const dot = browserStatus.querySelector('.browser-dot');
   const label = browserStatus.querySelector('.browser-label');
 
-  if (status === 'open' || status === 'launching') {
-    dot.classList.add('active');
-    label.textContent = status === 'launching' ? 'Browser: Launching...' : 'Browser: Active';
-  } else {
-    dot.classList.remove('active');
-    label.textContent = 'Browser: Idle';
+  if (dot && label) {
+    if (status === 'open' || status === 'launching') {
+      dot.classList.add('active');
+      label.textContent = status === 'launching' ? 'Browser: Launching...' : 'Browser: Active';
+    } else {
+      dot.classList.remove('active');
+      label.textContent = 'Browser: Idle';
+    }
   }
 }
 
 function scrollToBottom() {
+  const messagesContainer = $('#messages');
+  if (!messagesContainer) return;
   requestAnimationFrame(() => {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   });
 }
 
 function autoResizeTextarea() {
+  const commandInput = $('#command-input');
+  if (!commandInput) return;
   commandInput.addEventListener('input', () => {
     commandInput.style.height = 'auto';
     commandInput.style.height = Math.min(commandInput.scrollHeight, 120) + 'px';
@@ -585,50 +633,33 @@ function formatDate(isoStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/**
- * Basic markdown to HTML converter for task summaries.
- */
 function markdownToHtml(md) {
   if (!md) return '';
   let html = escapeHtml(md);
 
-  // Headers
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-
-  // Bold & italic
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-  // Inline code
   html = html.replace(/`(.+?)`/g, '<code>$1</code>');
-
-  // Unordered lists
   html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/gs, '<ul>$&</ul>');
-
-  // Ordered lists
   html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
 
-  // Tables
   html = html.replace(/\|(.+)\|/g, (match) => {
     const cells = match.split('|').filter(c => c.trim());
-    if (cells.every(c => /^[-:]+$/.test(c.trim()))) return ''; // separator row
+    if (cells.every(c => /^[-:]+$/.test(c.trim()))) return '';
     const tag = html.indexOf(match) < html.indexOf('\n') ? 'th' : 'td';
     const row = cells.map(c => `<${tag}>${c.trim()}</${tag}>`).join('');
     return `<tr>${row}</tr>`;
   });
-  // Wrap table rows
   if (html.includes('<tr>')) {
     html = html.replace(/(<tr>.*<\/tr>\n?)+/gs, '<table>$&</table>');
   }
 
-  // Line breaks (but not inside elements)
   html = html.replace(/\n\n/g, '</p><p>');
   html = html.replace(/\n/g, '<br>');
-
-  // Links
   html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
 
   return `<p>${html}</p>`;
