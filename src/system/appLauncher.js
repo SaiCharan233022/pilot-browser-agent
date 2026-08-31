@@ -439,7 +439,7 @@ export async function launchApp(appName) {
   const app = findInstalledAppSync(normalized);
   if (app && app.AppID) {
     try {
-      await execAsync(`powershell.exe -NoProfile -Command "Start-Process explorer.exe 'shell:AppsFolder\\${app.AppID}'"`);
+      await execAsync(`powershell.exe -NoProfile -Command "Start-Process 'shell:AppsFolder\\${app.AppID}' -ErrorAction SilentlyContinue; if (!$?) { Start-Process explorer.exe 'shell:AppsFolder\\${app.AppID}' }"`);
       await new Promise(r => setTimeout(r, 500));
       return {
         success: true,

@@ -202,14 +202,6 @@ export function createAppServer(port = 3000) {
 async function handleClientMessage(message, broadcast) {
   switch (message.type) {
     case 'command': {
-      if (!isGeminiReady()) {
-        broadcast({
-          type: 'error',
-          message: 'Please set your Gemini API key in Settings first.',
-        });
-        return;
-      }
-
       // Run the task (this is async and broadcasts progress via WebSocket)
       runTask(message.text, {
         headless: message.headless ?? (process.env.HEADLESS === 'true'),
