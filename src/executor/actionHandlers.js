@@ -1,5 +1,5 @@
 /**
- * Action Handlers — maps plan actions to browser and system controller methods.
+ * Action Handlers — maps plan actions to browser, system, and perception methods.
  * Each handler executes a single action and returns a result.
  */
 
@@ -10,6 +10,9 @@ import { launchApp, closeApp, getRunningApps } from '../system/appLauncher.js';
 import { focusWindow, typeDesktopText, sendDesktopKey, openAndPlay } from '../system/desktopController.js';
 import { saveKnowledge, recallKnowledge, getAllKnowledge, forgetKnowledge, searchKnowledge, getUserInputs, searchConversationHistory } from '../storage/memory.js';
 import { searchFiles, readFileContent, listDirectory } from '../system/fileExplorer.js';
+import { inspectScreen, captureScreen } from '../perception/screenCapture.js';
+import { executeTerminalCommand } from '../system/terminalRunner.js';
+import { extractPdfText } from '../system/pdfExtractor.js';
 
 /**
  * Execute a single action step.
@@ -182,6 +185,27 @@ const actionMap = {
    */
   file_list: async (step) => {
     return await listDirectory(step.dirQuery || step.text || 'project');
+  },
+
+  /**
+   * Desktop Screen Perception & Vision Inspection.
+   */
+  desktop_screen_inspect: async (step) => {
+    return await inspectScreen(step.prompt || step.text || 'What is currently displayed on this screen?');
+  },
+
+  /**
+   * Safe Terminal & Command Execution Sandbox.
+   */
+  terminal_command: async (step) => {
+    return await executeTerminalCommand(step.command || step.text, { cwd: step.cwd });
+  },
+
+  /**
+   * PDF Document Reader & Structured Extractor.
+   */
+  pdf_read: async (step) => {
+    return await extractPdfText(step.filePath || step.text);
   },
 
   /**

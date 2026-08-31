@@ -249,7 +249,8 @@ export async function runTask(command, options = {}) {
     'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
     'desktop_focus', 'desktop_type', 'desktop_key',
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
-    'file_search', 'file_read', 'file_list',
+    'file_search', 'file_read', 'file_list', 'pdf_read',
+    'desktop_screen_inspect', 'terminal_command',
   ];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
@@ -333,6 +334,27 @@ export async function runTask(command, options = {}) {
         summary = `Contents of ${res.directory} (${res.totalItems} items):\n\n${itemsList}`;
       } else {
         summary = `Directory is empty or could not be accessed.`;
+      }
+    } else if (lastStep.action === 'desktop_screen_inspect') {
+      const res = lastStep.result || {};
+      if (res.success && res.analysis) {
+        summary = `🖥️ **Screen Analysis (${res.source === 'desktop' ? 'Full Desktop' : 'Active Viewport'}):**\n\n${res.analysis}`;
+      } else {
+        summary = `Could not inspect screen: ${res.error || 'Unknown error'}`;
+      }
+    } else if (lastStep.action === 'terminal_command') {
+      const res = lastStep.result || {};
+      if (res.success) {
+        summary = `⌨️ **Command:** \`${res.command}\`\n\n\`\`\`text\n${res.output}\n\`\`\``;
+      } else {
+        summary = `❌ **Command Error:** \`${res.command}\`\n\n\`\`\`text\n${res.error || res.stderr || 'Execution failed'}\n\`\`\``;
+      }
+    } else if (lastStep.action === 'pdf_read') {
+      const res = lastStep.result || {};
+      if (res.success) {
+        summary = `📑 **PDF Extracted:** ${res.name} (${res.size}, ${res.charCount} chars):\n\n${res.content}`;
+      } else {
+        summary = `Could not extract PDF: ${res.error || 'Unknown error'}`;
       }
     } else {
       summary = `Task completed successfully.`;

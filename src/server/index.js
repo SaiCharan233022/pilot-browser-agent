@@ -132,6 +132,20 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+/**
+ * GET /api/memory — Get stored personal facts and input history.
+ */
+app.get('/api/memory', async (req, res) => {
+  try {
+    const { getAllKnowledge, getUserInputs } = await import('../storage/memory.js');
+    const facts = getAllKnowledge(50);
+    const inputs = getUserInputs(30);
+    res.json({ success: true, facts, inputs });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // === WebSocket Server ===
 
 /**

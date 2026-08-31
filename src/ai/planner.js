@@ -27,6 +27,8 @@ export async function createPlan(command) {
     steps: (aiPlan.steps || []).map((step, index) => ({
       id: step.id || index + 1,
       action: validateAction(step.action),
+      command: step.command || null,
+      prompt: step.prompt || null,
       mediaAction: step.mediaAction || null,
       appName: step.appName || null,
       key: step.key || null,
@@ -318,6 +320,52 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
+  // 9. Desktop Screen Perception & Vision Inspection
+  if (
+    lower.match(/^(?:what\s+is\s+on\s+my\s+screen|inspect\s+(?:my\s+)?screen|look\s+at\s+my\s+screen|what\s+is\s+on\s+desktop|summarize\s+(?:my\s+)?screen|take\s+a\s+screenshot)/i)
+  ) {
+    return {
+      summary: 'Inspect and analyze your screen with Gemini Vision',
+      steps: [{
+        id: 1,
+        action: 'desktop_screen_inspect',
+        prompt: rawCmd,
+        description: 'Capture screen and analyze with Gemini Vision',
+      }],
+    };
+  }
+
+  // 10. Safe Terminal & Command Execution
+  const termMatch = lower.match(/^(?:run\s+command|execute\s+command|run\s+terminal|execute|run)\s+(.+)$/i);
+  if (termMatch && !lower.startsWith('open ') && !lower.startsWith('launch ') && !lower.startsWith('start ') && !lower.startsWith('play ') && !lower.startsWith('set ') && !lower.startsWith('find ') && !lower.startsWith('read ') && !lower.startsWith('list ')) {
+    let commandToRun = rawCmd.slice(rawCmd.toLowerCase().indexOf(termMatch[1].toLowerCase())).trim();
+    commandToRun = commandToRun.replace(/^[`"']+|[`"']+$/g, '');
+    return {
+      summary: `Execute terminal command: "${commandToRun}"`,
+      steps: [{
+        id: 1,
+        action: 'terminal_command',
+        command: commandToRun,
+        description: `Run shell command: ${commandToRun}`,
+      }],
+    };
+  }
+
+  // 11. PDF Document Reader
+  const pdfMatch = lower.match(/(?:read|summarize|extract(?:\s+text\s+from)?)(?:\s+pdf)?\s+([a-z0-9_./\\-]+\.pdf)/i);
+  if (pdfMatch) {
+    const pdfPath = pdfMatch[1].trim();
+    return {
+      summary: `Read and extract PDF document: ${pdfPath}`,
+      steps: [{
+        id: 1,
+        action: 'pdf_read',
+        filePath: pdfPath,
+        description: `Extract text from ${pdfPath}`,
+      }],
+    };
+  }
+
   // 9. Unified Open / Launch System
   const openMatch = lower.match(/^(?:open|launch|start)(?:\s+(?:the|app|my|up))?\s+(.+)$/i);
   if (openMatch) {
@@ -500,7 +548,8 @@ function validateAction(action) {
     'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
     'desktop_focus', 'desktop_type', 'desktop_key',
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
-    'file_search', 'file_read', 'file_list',
+    'file_search', 'file_read', 'file_list', 'pdf_read',
+    'desktop_screen_inspect', 'terminal_command',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',
   ];

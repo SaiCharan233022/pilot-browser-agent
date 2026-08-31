@@ -1,7 +1,9 @@
 /**
- * Pilot — Frontend Chat Application
- * Bulletproof, high-speed, and conversational browser automation client.
+ * Pilot — Frontend Chat Application & Personal AI Operating Layer
+ * Bulletproof, high-speed, conversational multimodal client with Voice & Memory.
  */
+
+import { voice } from './voice.js';
 
 // === State ===
 let ws = null;
@@ -10,6 +12,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 const activePlans = new Map(); // taskId → { steps, element }
 let isFirstMessage = true;
 let currentStatusEl = null;
+let currentMemoryTab = 'facts';
 
 // === DOM Element Selectors ===
 const $ = (sel) => document.querySelector(sel);
@@ -83,33 +86,19 @@ function attemptReconnect() {
   }, delay);
 }
 
-function send(message) {
+function send(data) {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(message));
+    ws.send(JSON.stringify(data));
   } else {
-    // If socket is momentarily connecting, wait and send
-    setTimeout(() => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(message));
-      }
-    }, 500);
+    console.warn('Cannot send: WebSocket not open');
   }
 }
 
-// === Message Handling ===
+// === Server Message Handler ===
 function handleServerMessage(msg) {
   switch (msg.type) {
-    case 'connected':
-      updateBrowserStatus(msg.browser);
-      if (msg.gemini !== 'ready') {
-        showSetupPrompt();
-      }
-      break;
-
     case 'status':
-      if (msg.status === 'planning' || msg.status === 'summarizing' || msg.status === 'replanning') {
-        renderStatusMessage(msg.message, msg.status);
-      }
+      renderStatusMessage(msg.message, msg.status);
       break;
 
     case 'plan':
@@ -164,10 +153,9 @@ function handleServerMessage(msg) {
       }
       renderTaskSummary(msg);
       loadTaskHistory();
-      break;
-
-    case 'replanning':
-      renderStatusMessage(`🔄 Re-planning: ${msg.reason}`, 'replanning');
+      if (msg.summary) {
+        voice.speak(msg.summary);
+      }
       break;
 
     case 'replan_complete':
@@ -248,19 +236,28 @@ function renderPlan(msg) {
         <span class="message-time">${formatTime()}</span>
       </div>
       <div class="agent-live-status" id="live-status-${msg.taskId}">
-        <div class="spinner"></div> <span>${escapeHtml(msg.summary || 'Working on your task...')}</span>
+        <div class="spinner"></div>
+        <span>${escapeHtml(msg.summary)}</span>
       </div>
     </div>
   `;
 
-  activePlans.set(msg.taskId, { steps: msg.steps, element: div });
+  activePlans.set(msg.taskId, {
+    steps: msg.steps || [],
+    element: div,
+  });
+
   scrollToBottom();
 }
 
-function updateStepStatus(taskId, stepId, status, description) {
+function updateStepStatus(taskId, stepId, status, description, result, screenshot, error) {
   const statusEl = $(`#live-status-${taskId}`);
   if (statusEl && description) {
-    statusEl.innerHTML = `<div class="spinner"></div> <span>${escapeHtml(description)}...</span>`;
+    if (status === 'running') {
+      statusEl.innerHTML = `<div class="spinner"></div> <span>${escapeHtml(description)}...</span>`;
+    } else if (status === 'completed') {
+      statusEl.innerHTML = `<span style="color: var(--success);">✔</span> <span>${escapeHtml(description)}</span>`;
+    }
   }
   scrollToBottom();
 }
@@ -330,24 +327,23 @@ function removeStatusMessage() {
     currentStatusEl.remove();
     currentStatusEl = null;
   }
-  const messagesContainer = $('#messages');
-  if (messagesContainer) {
-    const orphans = messagesContainer.querySelectorAll('.status-message');
-    orphans.forEach(el => el.remove());
-  }
 }
 
-function renderStatusMessage(text, status) {
+function renderStatusMessage(text, type = 'status') {
   removeStatusMessage();
+  showMessages();
   const messagesContainer = $('#messages');
   if (!messagesContainer) return;
+
   const div = document.createElement('div');
-  div.className = 'status-message';
-  if (status === 'planning' || status === 'summarizing' || status === 'replanning') {
-    div.innerHTML = `<div class="spinner"></div> ${escapeHtml(text)}`;
-  } else {
-    div.textContent = text;
-  }
+  div.className = 'message system-status';
+  div.innerHTML = `
+    <div class="status-pill">
+      <div class="spinner"></div>
+      <span>${escapeHtml(text)}</span>
+    </div>
+  `;
+
   currentStatusEl = div;
   messagesContainer.appendChild(div);
   scrollToBottom();
@@ -361,38 +357,16 @@ function renderErrorMessage(text) {
   div.className = 'message agent';
   div.innerHTML = `
     <div class="message-body">
-      <div class="error-card">
-        <div class="error-header">❌ Error</div>
-        <div class="error-body">${escapeHtml(text)}</div>
+      <div class="message-header">
+        <div class="message-avatar">🧭</div>
+        <span class="message-sender">Pilot</span>
+        <span class="message-time">${formatTime()}</span>
       </div>
+      <div class="agent-error">❌ ${escapeHtml(text)}</div>
     </div>
   `;
   messagesContainer.appendChild(div);
   scrollToBottom();
-}
-
-function showSetupPrompt() {
-  showMessages();
-  const messagesContainer = $('#messages');
-  if (!messagesContainer) return;
-  const div = document.createElement('div');
-  div.className = 'message agent';
-  div.innerHTML = `
-    <div class="message-body">
-      <div class="message-header">
-        <div class="message-avatar">🧭</div>
-        <span class="message-sender">Pilot</span>
-      </div>
-      <p style="margin-bottom: var(--space-md); color: var(--text-secondary);">
-        Welcome! Before we get started, I need a <strong>Gemini API key</strong> to power my brain.
-      </p>
-      <p style="margin-bottom: var(--space-md); color: var(--text-secondary);">
-        It's free! Get one from <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a>, 
-        then click <strong>Settings ⚙️</strong> in the top right to paste it in.
-      </p>
-    </div>
-  `;
-  messagesContainer.appendChild(div);
 }
 
 // === Event Listeners ===
@@ -400,7 +374,63 @@ function setupEventListeners() {
   const sendBtn = $('#btn-send');
   const commandInput = $('#command-input');
   const settingsModal = $('#settings-modal');
+  const memoryModal = $('#memory-modal');
   const sidebar = $('#sidebar');
+  const micBtn = $('#btn-mic');
+  const voiceToggleBtn = $('#btn-voice-toggle');
+
+  // Voice Input (Speech-to-Text)
+  micBtn?.addEventListener('click', () => {
+    voice.toggleListening(
+      (transcript, isFinal) => {
+        if (commandInput) {
+          commandInput.value = transcript;
+          commandInput.style.height = 'auto';
+          commandInput.style.height = Math.min(commandInput.scrollHeight, 120) + 'px';
+          if (isFinal) {
+            sendCommand();
+          }
+        }
+      },
+      (status) => {
+        if (status === 'listening') {
+          micBtn.classList.add('recording');
+          micBtn.title = 'Listening... Speak now!';
+        } else {
+          micBtn.classList.remove('recording');
+          micBtn.title = 'Voice Input (Speech-to-Text)';
+        }
+      }
+    );
+  });
+
+  // Voice Response (TTS) Toggle
+  voiceToggleBtn?.addEventListener('click', () => {
+    const enabled = voice.toggleTTS();
+    voiceToggleBtn.classList.toggle('active', enabled);
+    voiceToggleBtn.title = enabled ? 'Voice Responses Enabled' : 'Voice Responses Disabled';
+  });
+
+  // Memory Modal
+  $('#btn-memory')?.addEventListener('click', () => {
+    memoryModal?.classList.remove('hidden');
+    loadMemoryData();
+  });
+  $('#btn-close-memory')?.addEventListener('click', () => memoryModal?.classList.add('hidden'));
+
+  // Memory Tabs
+  $('#tab-facts')?.addEventListener('click', () => {
+    currentMemoryTab = 'facts';
+    $('#tab-facts')?.classList.add('active');
+    $('#tab-history')?.classList.remove('active');
+    renderMemoryTab();
+  });
+  $('#tab-history')?.addEventListener('click', () => {
+    currentMemoryTab = 'history';
+    $('#tab-history')?.classList.add('active');
+    $('#tab-facts')?.classList.remove('active');
+    renderMemoryTab();
+  });
 
   // Send button click
   sendBtn?.addEventListener('click', (e) => {
@@ -427,7 +457,10 @@ function setupEventListeners() {
   // Settings modal
   $('#btn-settings')?.addEventListener('click', () => settingsModal?.classList.remove('hidden'));
   $('#btn-close-settings')?.addEventListener('click', () => settingsModal?.classList.add('hidden'));
-  $('.modal-overlay')?.addEventListener('click', () => settingsModal?.classList.add('hidden'));
+  $('.modal-overlay')?.addEventListener('click', () => {
+    settingsModal?.classList.add('hidden');
+    memoryModal?.classList.add('hidden');
+  });
 
   // API key save
   $('#btn-save-key')?.addEventListener('click', saveApiKey);
@@ -455,6 +488,7 @@ function setupEventListeners() {
     if (e.key === 'Escape') {
       closeLightbox();
       settingsModal?.classList.add('hidden');
+      memoryModal?.classList.add('hidden');
     }
   });
 }
@@ -470,6 +504,63 @@ function sendCommand() {
   commandInput.value = '';
   commandInput.style.height = 'auto';
   commandInput.focus();
+}
+
+// === Memory Inspector Data ===
+let cachedMemoryData = { facts: [], inputs: [] };
+
+async function loadMemoryData() {
+  const container = $('#memory-tab-content');
+  if (container) container.innerHTML = '<p class="setting-desc">Loading personal memory...</p>';
+  try {
+    const res = await fetch('/api/memory');
+    cachedMemoryData = await res.json();
+    renderMemoryTab();
+  } catch (err) {
+    if (container) container.innerHTML = `<p class="setting-desc" style="color: var(--error);">Error loading memory: ${err.message}</p>`;
+  }
+}
+
+function renderMemoryTab() {
+  const container = $('#memory-tab-content');
+  if (!container) return;
+
+  if (currentMemoryTab === 'facts') {
+    const facts = cachedMemoryData.facts || [];
+    if (facts.length === 0) {
+      container.innerHTML = '<p class="setting-desc">No saved facts yet. Tell Pilot: "Remember that my name is Sai".</p>';
+      return;
+    }
+    container.innerHTML = `
+      <div class="memory-list">
+        ${facts.map(f => `
+          <div class="memory-card">
+            <div class="memory-card-header">
+              <span class="memory-key">${escapeHtml(f.key)}</span>
+              <span class="memory-time">${formatDate(f.updated_at)}</span>
+            </div>
+            <div class="memory-val">${escapeHtml(f.content)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else {
+    const inputs = cachedMemoryData.inputs || [];
+    if (inputs.length === 0) {
+      container.innerHTML = '<p class="setting-desc">No input history yet.</p>';
+      return;
+    }
+    container.innerHTML = `
+      <div class="memory-list">
+        ${inputs.map(i => `
+          <div class="memory-card">
+            <div class="memory-val">${escapeHtml(i.text)}</div>
+            <div class="memory-time">${formatDate(i.created_at)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
 }
 
 // === Settings ===
@@ -597,7 +688,7 @@ function updateBrowserStatus(status) {
       label.textContent = status === 'launching' ? 'Browser: Launching...' : 'Browser: Active';
     } else {
       dot.classList.remove('active');
-      label.textContent = 'Browser: Idle';
+      label.textContent = 'AI Ready';
     }
   }
 }
@@ -648,12 +739,13 @@ function markdownToHtml(md) {
   if (!md) return '';
   let html = escapeHtml(md);
 
+  html = html.replace(/```(?:[a-zA-Z]*)\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/`(.+?)`/g, '<code>$1</code>');
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
   html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/gs, '<ul>$&</ul>');
   html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
