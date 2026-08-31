@@ -156,7 +156,27 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 3. Open App or Web Service / Any Website
+  // 3. Web Search Queries (e.g. "search for james webb telescope", "google latest AI news")
+  const searchMatch = cmd.match(/^(?:search(?:\s+(?:for|on\s+google\s+for|on\s+web\s+for))?|google)\s+(.+)$/i);
+  if (searchMatch && !cmd.startsWith('open')) {
+    const query = searchMatch[1].trim();
+    const encoded = encodeURIComponent(query);
+    const searchUrl = `https://www.google.com/search?q=${encoded}`;
+    return {
+      summary: `Search for "${query}"`,
+      steps: [
+        {
+          id: 1,
+          action: 'navigate',
+          targetName: `Google Search: "${query}"`,
+          url: searchUrl,
+          description: `Search Google for "${query}" on screen`,
+        },
+      ],
+    };
+  }
+
+  // 4. Open App or Web Service / Any Website
   const openMatch = cmd.match(/^open\s+([a-z0-9\s._:\/-]+)$/i);
   if (openMatch && !cmd.includes('and')) {
     const target = openMatch[1].trim();
