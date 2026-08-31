@@ -245,7 +245,12 @@ export async function runTask(command, options = {}) {
   // === SUMMARIZATION PHASE ===
   let summary = '';
   let openUrl = null;
-  const systemActionSet = ['media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play', 'desktop_focus', 'desktop_type', 'desktop_key'];
+  const systemActionSet = [
+    'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
+    'desktop_focus', 'desktop_type', 'desktop_key',
+    'remember_fact', 'recall_knowledge', 'forget_fact',
+    'file_search', 'file_read', 'file_list',
+  ];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
   if (plan.steps.length === 1 && plan.steps[0].action === 'navigate' && task.completedSteps.length > 0) {
