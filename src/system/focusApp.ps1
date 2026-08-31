@@ -22,7 +22,7 @@ public class WindowFocus {
 
 Start-Sleep -Milliseconds 400
 
-# 1. Try WScript.Shell AppActivate (works universally for names & titles)
+# 1. WScript.Shell AppActivate
 try {
     $ws = New-Object -ComObject WScript.Shell
     if ($AppName) {
@@ -30,16 +30,17 @@ try {
     }
 } catch {}
 
-# 2. Try User32 P/Invoke with HWND_TOPMOST force-elevation over active browser
+# 2. User32 P/Invoke with HWND_TOPMOST force-elevation over active browser
 try {
     $HWND_TOPMOST = [IntPtr](-1)
     $HWND_NOTOPMOST = [IntPtr](-2)
-    $SWP_FLAGS = 0x0003 # SWP_NOSIZE (0x0001) | SWP_NOMOVE (0x0002)
+    $SWP_FLAGS = 0x0003 # SWP_NOSIZE | SWP_NOMOVE
 
     $candidates = Get-Process | Where-Object { 
         $_.MainWindowHandle -ne [IntPtr]::Zero -and (
             $_.ProcessName -like "*$AppName*" -or 
-            $_.MainWindowTitle -like "*$AppName*"
+            $_.MainWindowTitle -like "*$AppName*" -or
+            ($_.ProcessName -eq "ApplicationFrameHost" -and $_.MainWindowTitle -ne "")
         )
     }
 
