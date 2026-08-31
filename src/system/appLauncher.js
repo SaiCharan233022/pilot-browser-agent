@@ -5,8 +5,21 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 const execAsync = promisify(exec);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const focusScriptPath = join(__dirname, 'focusApp.ps1');
+
+async function bringToForeground(name, appID = '') {
+  try {
+    const cleanName = (name || '').replace(/['"]/g, '');
+    const cleanAppID = (appID || '').replace(/['"]/g, '');
+    await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${focusScriptPath}" -AppName "${cleanName}" -AppID "${cleanAppID}"`);
+  } catch {}
+}
 
 /**
  * Registry of supported Windows application launchers and termination targets.
@@ -426,7 +439,7 @@ export async function launchApp(appName) {
   if (APP_REGISTRY[normalized]) {
     try {
       await execAsync(APP_REGISTRY[normalized].launchCmd);
-      await new Promise(r => setTimeout(r, 400));
+      await bringToForeground(normalized);
       return {
         success: true,
         appName,
@@ -440,7 +453,7 @@ export async function launchApp(appName) {
   if (app && app.AppID) {
     try {
       await execAsync(`powershell.exe -NoProfile -Command "Start-Process 'shell:AppsFolder\\${app.AppID}' -ErrorAction SilentlyContinue; if (!$?) { Start-Process explorer.exe 'shell:AppsFolder\\${app.AppID}' }"`);
-      await new Promise(r => setTimeout(r, 500));
+      await bringToForeground(app.Name || normalized, app.AppID);
       return {
         success: true,
         appName: app.Name || appName,
@@ -453,7 +466,7 @@ export async function launchApp(appName) {
   try {
     const fallbackCmd = `powershell.exe -NoProfile -Command "Start-Process '${appName}.exe' -ErrorAction SilentlyContinue; if (!$?) { Start-Process '${appName}:' -ErrorAction SilentlyContinue; if (!$?) { Start-Process '${appName}' } }"`;
     await execAsync(fallbackCmd);
-    await new Promise(r => setTimeout(r, 400));
+    await bringToForeground(normalized);
     return {
       success: true,
       appName,
