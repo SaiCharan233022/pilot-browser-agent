@@ -135,12 +135,13 @@ export async function navigate(url, taskId) {
     const { exec } = await import('child_process');
     const launchScript = `try { Start-Process chrome.exe -ArgumentList '--new-window', '${url}' -ErrorAction Stop } catch { try { Start-Process msedge.exe -ArgumentList '--new-window', '${url}' -ErrorAction Stop } catch { Start-Process '${url}' } }`;
     exec(`powershell.exe -NoProfile -Command "${launchScript}"`);
-    setTimeout(() => {
-      focusWindow('chrome').catch(() => {});
-      focusWindow('msedge').catch(() => {});
-      focusWindow('brave').catch(() => {});
-      focusWindow('firefox').catch(() => {});
-    }, 400);
+    setTimeout(async () => {
+      try {
+        const focusPath = join(process.cwd(), 'src', 'system', 'focusApp.ps1');
+        exec(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${focusPath}" -AppName "chrome"`);
+        exec(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${focusPath}" -AppName "msedge"`);
+      } catch {}
+    }, 450);
   } catch {}
 
   // 2. Concurrently load in Playwright engine for automated interactions

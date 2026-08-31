@@ -15,6 +15,8 @@ public class WindowFocus {
     public static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
     [DllImport("user32.dll")]
     public static extern bool BringWindowToTop(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 }
 '@ -ErrorAction SilentlyContinue
 
@@ -28,8 +30,12 @@ try {
     }
 } catch {}
 
-# 2. Try User32 P/Invoke with MainWindowHandle
+# 2. Try User32 P/Invoke with HWND_TOPMOST force-elevation over active browser
 try {
+    $HWND_TOPMOST = [IntPtr](-1)
+    $HWND_NOTOPMOST = [IntPtr](-2)
+    $SWP_FLAGS = 0x0003 # SWP_NOSIZE (0x0001) | SWP_NOMOVE (0x0002)
+
     $candidates = Get-Process | Where-Object { 
         $_.MainWindowHandle -ne [IntPtr]::Zero -and (
             $_.ProcessName -like "*$AppName*" -or 
@@ -40,8 +46,11 @@ try {
     foreach ($proc in $candidates) {
         [WindowFocus]::ShowWindow($proc.MainWindowHandle, 9) # 9 = SW_RESTORE
         [WindowFocus]::BringWindowToTop($proc.MainWindowHandle)
+        [WindowFocus]::SetWindowPos($proc.MainWindowHandle, $HWND_TOPMOST, 0, 0, 0, 0, $SWP_FLAGS)
         [WindowFocus]::SetForegroundWindow($proc.MainWindowHandle)
         [WindowFocus]::SwitchToThisWindow($proc.MainWindowHandle, $true)
+        Start-Sleep -Milliseconds 250
+        [WindowFocus]::SetWindowPos($proc.MainWindowHandle, $HWND_NOTOPMOST, 0, 0, 0, 0, $SWP_FLAGS)
     }
 } catch {}
 
