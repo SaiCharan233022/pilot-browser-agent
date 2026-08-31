@@ -226,7 +226,37 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 5. Knowledge Memory: Forget
+  // 5. Input History Queries (Continuous conversation memory)
+  if (
+    lower.match(/^what\s+did\s+i\s+(?:ask|say|type|command|tell\s+you)(?:\s+earlier|\s+before|\s+previously)?/i) ||
+    lower.match(/^what\s+was\s+my\s+last\s+(?:command|input|message|query|task)/i) ||
+    lower.match(/^(?:show|list|get)\s+(?:my\s+)?(?:input\s+history|chat\s+history|all\s+inputs|recent\s+inputs|inputs)/i)
+  ) {
+    return {
+      summary: 'Retrieve your recent input and conversation history',
+      steps: [{
+        id: 1,
+        action: 'history_query',
+        limit: 15,
+        description: 'Query stored conversation inputs',
+      }],
+    };
+  }
+  const searchHistMatch = lower.match(/^search\s+history\s+(?:for\s+)?(.+)$/i);
+  if (searchHistMatch) {
+    const q = searchHistMatch[1].trim();
+    return {
+      summary: `Search conversation history for "${q}"`,
+      steps: [{
+        id: 1,
+        action: 'history_query',
+        query: q,
+        description: `Search history for ${q}`,
+      }],
+    };
+  }
+
+  // 6. Knowledge Memory: Forget
   const forgetMatch = lower.match(/^(?:forget|delete\s+note|remove\s+knowledge)\s+(?:my\s+)?([^?]+)/i);
   if (forgetMatch) {
     const key = forgetMatch[1].trim();
@@ -469,7 +499,7 @@ function validateAction(action) {
   const validActions = [
     'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
     'desktop_focus', 'desktop_type', 'desktop_key',
-    'remember_fact', 'recall_knowledge', 'forget_fact',
+    'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
     'file_search', 'file_read', 'file_list',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',

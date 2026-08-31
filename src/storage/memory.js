@@ -1,7 +1,7 @@
 /**
  * Pilot Memory System
  * Provides Short-Term Context, Multi-turn Conversation Memory,
- * and Persistent Knowledge/Preferences tracking across agent runs.
+ * Full Input History Logging, and Persistent Knowledge/Preferences tracking across agent runs.
  */
 
 import Database from 'better-sqlite3';
@@ -93,6 +93,7 @@ export function getMemory(key, defaultValue = null) {
 
 /**
  * Record a conversation turn into memory for context tracking.
+ * Automatically saves EVERY user input and assistant response.
  */
 export function recordTurn(role, text, { intent = null, target = null, metadata = {} } = {}) {
   if (!memoryDb) initMemory();
@@ -110,6 +111,9 @@ export function recordTurn(role, text, { intent = null, target = null, metadata 
       new Date().toISOString()
     );
 
+    if (role === 'user') {
+      setMemory('last_user_input', text, 'history');
+    }
     if (target) {
       setMemory('last_target', target, 'context');
     }
@@ -124,16 +128,53 @@ export function recordTurn(role, text, { intent = null, target = null, metadata 
 /**
  * Get recent conversation turns for context-aware multi-turn reasoning.
  */
-export function getRecentTurns(limit = 6) {
+export function getRecentTurns(limit = 10) {
   if (!memoryDb) initMemory();
   try {
     const rows = memoryDb.prepare(`
-      SELECT role, text, intent, target, metadata, created_at
+      SELECT id, role, text, intent, target, metadata, created_at
       FROM conversation_turns
       ORDER BY id DESC
       LIMIT ?
     `).all(limit);
     return rows.reverse();
+  } catch (err) {
+    return [];
+  }
+}
+
+/**
+ * Get all user inputs from conversation history.
+ */
+export function getUserInputs(limit = 25) {
+  if (!memoryDb) initMemory();
+  try {
+    return memoryDb.prepare(`
+      SELECT id, text, created_at
+      FROM conversation_turns
+      WHERE role = 'user'
+      ORDER BY id DESC
+      LIMIT ?
+    `).all(limit);
+  } catch (err) {
+    return [];
+  }
+}
+
+/**
+ * Search past conversation turns by query.
+ */
+export function searchConversationHistory(query, limit = 20) {
+  if (!memoryDb) initMemory();
+  try {
+    const q = `%${(query || '').trim().toLowerCase()}%`;
+    return memoryDb.prepare(`
+      SELECT id, role, text, created_at
+      FROM conversation_turns
+      WHERE LOWER(text) LIKE ?
+      ORDER BY id DESC
+      LIMIT ?
+    `).all(q, limit);
   } catch (err) {
     return [];
   }

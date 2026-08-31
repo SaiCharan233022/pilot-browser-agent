@@ -8,7 +8,7 @@ import { analyzeScreenshot, findSelector } from '../ai/gemini.js';
 import { executeMediaAction } from '../system/mediaController.js';
 import { launchApp, closeApp, getRunningApps } from '../system/appLauncher.js';
 import { focusWindow, typeDesktopText, sendDesktopKey, openAndPlay } from '../system/desktopController.js';
-import { saveKnowledge, recallKnowledge, getAllKnowledge, forgetKnowledge, searchKnowledge } from '../storage/memory.js';
+import { saveKnowledge, recallKnowledge, getAllKnowledge, forgetKnowledge, searchKnowledge, getUserInputs, searchConversationHistory } from '../storage/memory.js';
 import { searchFiles, readFileContent, listDirectory } from '../system/fileExplorer.js';
 
 /**
@@ -142,6 +142,18 @@ const actionMap = {
     }
     const all = getAllKnowledge();
     return { success: true, count: all.length, knowledge: all };
+  },
+
+  /**
+   * Query conversation and input history.
+   */
+  history_query: async (step) => {
+    if (step.query) {
+      const matches = searchConversationHistory(step.query);
+      return { success: true, count: matches.length, history: matches };
+    }
+    const inputs = getUserInputs(step.limit || 15);
+    return { success: true, count: inputs.length, inputs };
   },
 
   /**

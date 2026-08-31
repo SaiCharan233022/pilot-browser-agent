@@ -248,7 +248,7 @@ export async function runTask(command, options = {}) {
   const systemActionSet = [
     'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
     'desktop_focus', 'desktop_type', 'desktop_key',
-    'remember_fact', 'recall_knowledge', 'forget_fact',
+    'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
     'file_search', 'file_read', 'file_list',
   ];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
@@ -296,6 +296,17 @@ export async function runTask(command, options = {}) {
         summary = `Here is what I remember:\n${list}`;
       } else {
         summary = `I don't have any saved knowledge for that yet. You can tell me "Remember that my <item> is <value>".`;
+      }
+    } else if (lastStep.action === 'history_query') {
+      const res = lastStep.result || {};
+      if (res.history && res.history.length > 0) {
+        const list = res.history.map(h => `• [${h.role.toUpperCase()}] ${h.text}`).join('\n');
+        summary = `Found ${res.count} matching message(s) in history:\n\n${list}`;
+      } else if (res.inputs && res.inputs.length > 0) {
+        const list = res.inputs.map((inp, idx) => `${idx + 1}. "${inp.text}" (${new Date(inp.created_at).toLocaleTimeString()})`).join('\n');
+        summary = `Here are your recent inputs:\n\n${list}`;
+      } else {
+        summary = `No previous input history found.`;
       }
     } else if (lastStep.action === 'forget_fact') {
       const res = lastStep.result || {};
