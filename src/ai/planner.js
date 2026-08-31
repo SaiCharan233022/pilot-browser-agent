@@ -195,15 +195,15 @@ function getFastPathPlan(rawCmd) {
     const target = openMatch[1].trim();
     const targetLower = target.toLowerCase();
 
-    // 1. Explicit Web Services & URLs (e.g. gemini, cricbuzz, geeksforgeeks, leetcode, http://, .com)
-    if (WEB_SERVICES[targetLower] ||
-        targetLower.startsWith('http://') ||
-        targetLower.startsWith('https://') ||
-        targetLower.startsWith('www.') ||
-        /\.[a-z]{2,}(\/.*)?$/i.test(targetLower) ||
-        targetLower.endsWith(' ai') ||
-        targetLower.endsWith(' website') ||
-        targetLower.endsWith(' site')) {
+    // 1. Explicit URLs & Domain extensions (e.g. https://..., www..., leetcode.com, github.com/trending, or ends with 'website' / 'site')
+    const isExplicitUrl = targetLower.startsWith('http://') ||
+                          targetLower.startsWith('https://') ||
+                          targetLower.startsWith('www.') ||
+                          /\.[a-z]{2,}(\/.*)?$/i.test(targetLower) ||
+                          targetLower.endsWith(' website') ||
+                          targetLower.endsWith(' site');
+
+    if (isExplicitUrl) {
       const targetUrl = resolveUrl(target);
       return {
         summary: `Open ${target}`,
@@ -217,7 +217,7 @@ function getFastPathPlan(rawCmd) {
       };
     }
 
-    // 2. Installed internal laptop application (e.g. WhatsApp, Word, PowerPoint, Spotify, Notepad, Paint, AutoCAD, etc.)
+    // 2. Check if it is an INSTALLED LAPTOP APPLICATION on this computer
     const installedApp = findInstalledAppSync(targetLower);
     if (installedApp) {
       return {
@@ -231,7 +231,7 @@ function getFastPathPlan(rawCmd) {
       };
     }
 
-    // 3. Otherwise default to website URL
+    // 3. Otherwise it is a WEBSITE ON THE INTERNET (e.g. Gemini, Cricbuzz, GeeksforGeeks, KissAnime, HiAnime, AniSuge, etc.)
     const targetUrl = resolveUrl(target);
     return {
       summary: `Open ${target}`,
