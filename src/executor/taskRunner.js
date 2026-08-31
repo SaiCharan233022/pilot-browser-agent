@@ -265,9 +265,15 @@ export async function runTask(command, options = {}) {
       summary = lastStep.amount != null ? `System volume set to ${lastStep.amount}%.` : `Media action (${act}) executed successfully.`;
     } else if (lastStep.action === 'open_and_play') {
       summary = `Opened ${lastStep.appName || 'Spotify'} and started playback of your song.`;
+      openUrl = 'https://open.spotify.com';
       setMemory('last_target', lastStep.appName || 'spotify', 'context');
     } else if (lastStep.action === 'app_launch') {
       summary = `Launched ${lastStep.appName || 'application'}.`;
+      if ((lastStep.appName || '').toLowerCase() === 'spotify') {
+        openUrl = 'https://open.spotify.com';
+      } else if (lastStep.result?.openUrl) {
+        openUrl = lastStep.result.openUrl;
+      }
       setMemory('last_target', lastStep.appName, 'context');
     } else if (lastStep.action === 'app_close') {
       summary = `Closed ${lastStep.appName || 'application'}.`;

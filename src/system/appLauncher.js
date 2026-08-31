@@ -71,9 +71,10 @@ const APP_REGISTRY = {
     execNames: ['cmd.exe'],
   },
   'spotify': {
-    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process spotify: -ErrorAction SilentlyContinue; if (!$?) { Start-Process explorer.exe shell:AppsFolder\\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify }"',
+    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process spotify: -ErrorAction SilentlyContinue; if (!$?) { Start-Process explorer.exe shell:AppsFolder\\SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify }; Start-Process \'https://open.spotify.com\'"',
     processPatterns: ['Spotify', 'SpotifyLauncher'],
     execNames: ['Spotify.exe', 'SpotifyLauncher.exe'],
+    openUrl: 'https://open.spotify.com',
   },
   'chrome': {
     launchCmd: 'powershell.exe -NoProfile -Command "Start-Process chrome"',
