@@ -61,6 +61,13 @@ const actionMap = {
   },
 
   /**
+   * System Media and Audio Status Query.
+   */
+  media_status: async () => {
+    return await executeMediaAction('status');
+  },
+
+  /**
    * Native Desktop Application Launch.
    */
   app_launch: async (step) => {

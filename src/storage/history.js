@@ -6,6 +6,8 @@ import Database from 'better-sqlite3';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 
+import { initMemory } from './memory.js';
+
 let db = null;
 
 /**
@@ -53,7 +55,8 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_at);
   `);
 
-  console.log('📦 Database initialized');
+  initMemory(db);
+  console.log('📦 Database & Memory initialized');
 }
 
 /**

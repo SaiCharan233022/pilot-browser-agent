@@ -4,6 +4,7 @@
 
 import { planTask as geminiPlan } from './gemini.js';
 import { v4 as uuidv4 } from 'uuid';
+import { getLastActiveTarget } from '../storage/memory.js';
 
 /**
  * Create an execution plan from a natural language command.
@@ -299,6 +300,28 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
+  // 7. Media and Volume Status Queries
+  if (
+    cmd === 'what song is playing' ||
+    cmd === 'what is playing' ||
+    cmd === 'current song' ||
+    cmd === 'media status' ||
+    cmd === 'check media' ||
+    cmd === 'audio status' ||
+    cmd === 'volume status' ||
+    cmd === 'what is the volume' ||
+    cmd === 'check volume'
+  ) {
+    return {
+      summary: 'Check system volume and active media',
+      steps: [{
+        id: 1,
+        action: 'media_status',
+        description: 'Query active media session and master volume level',
+      }],
+    };
+  }
+
   return null;
 }
 
@@ -307,7 +330,7 @@ function getFastPathPlan(rawCmd) {
  */
 function validateAction(action) {
   const validActions = [
-    'media_control', 'app_launch', 'app_close', 'open_and_play',
+    'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
     'desktop_focus', 'desktop_type', 'desktop_key',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',

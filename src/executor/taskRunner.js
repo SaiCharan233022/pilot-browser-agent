@@ -8,6 +8,7 @@ import { replan, summarizeTask } from '../ai/gemini.js';
 import { executeAction } from './actionHandlers.js';
 import * as browser from '../browser/controller.js';
 import { saveTask, saveStep, updateTaskStatus } from '../storage/history.js';
+import { recordTurn, setMemory } from '../storage/memory.js';
 
 // Active tasks (keyed by taskId)
 const activeTasks = new Map();
@@ -244,22 +245,30 @@ export async function runTask(command, options = {}) {
   // === SUMMARIZATION PHASE ===
   let summary = '';
   let openUrl = null;
-  const systemActionSet = ['media_control', 'app_launch', 'app_close', 'open_and_play', 'desktop_focus', 'desktop_type', 'desktop_key'];
+  const systemActionSet = ['media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play', 'desktop_focus', 'desktop_type', 'desktop_key'];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
   if (plan.steps.length === 1 && plan.steps[0].action === 'navigate' && task.completedSteps.length > 0) {
     openUrl = plan.steps[0].url;
     const name = plan.steps[0].targetName || 'website';
     summary = `Opened ${name} directly on your screen.`;
+    setMemory('last_target', name, 'context');
+    setMemory('last_url', openUrl, 'context');
   } else if (isAllSystemActions && task.completedSteps.length > 0) {
     const lastStep = task.completedSteps[task.completedSteps.length - 1];
-    if (lastStep.action === 'media_control') {
+    if (lastStep.action === 'media_status') {
+      const res = lastStep.result || {};
+      const songInfo = res.media && res.media.title ? `Playing "${res.media.title}" by ${res.media.artist || 'Unknown'}.` : (res.activeAudioApps && res.activeAudioApps.length ? `Audio apps active: ${res.activeAudioApps.join(', ')}.` : 'No media currently playing.');
+      summary = `Master volume: ${res.volume ?? 50}%. ${songInfo}`;
+    } else if (lastStep.action === 'media_control') {
       const act = lastStep.mediaAction || 'media action';
       summary = lastStep.amount != null ? `System volume set to ${lastStep.amount}%.` : `Media action (${act}) executed successfully.`;
     } else if (lastStep.action === 'open_and_play') {
       summary = `Opened ${lastStep.appName || 'Spotify'} and started playback of your song.`;
+      setMemory('last_target', lastStep.appName || 'spotify', 'context');
     } else if (lastStep.action === 'app_launch') {
       summary = `Launched ${lastStep.appName || 'application'}.`;
+      setMemory('last_target', lastStep.appName, 'context');
     } else if (lastStep.action === 'app_close') {
       summary = `Closed ${lastStep.appName || 'application'}.`;
     } else if (lastStep.action === 'desktop_type') {
@@ -282,6 +291,10 @@ export async function runTask(command, options = {}) {
   plan.status = 'completed';
   plan.completedAt = new Date().toISOString();
   updateTaskStatus(plan.taskId, 'completed', summary);
+
+  // Record conversation turn into persistent memory
+  recordTurn('user', command, { target: plan.target || null });
+  recordTurn('assistant', summary, { metadata: { taskId: plan.taskId } });
 
   broadcast({
     type: 'task_complete',

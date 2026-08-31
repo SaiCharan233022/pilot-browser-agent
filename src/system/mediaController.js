@@ -116,10 +116,37 @@ export async function volumeDown(step = 10) {
 }
 
 /**
+ * Get system audio and media session status.
+ */
+export async function getMediaStatus() {
+  try {
+    const raw = await runBridge('status');
+    const parsed = JSON.parse(raw);
+    return {
+      success: true,
+      volume: parsed.volume ?? 50,
+      media: parsed.media,
+      activeAudioApps: parsed.activeAudioApps || [],
+    };
+  } catch (err) {
+    const vol = await getVolume().catch(() => 50);
+    return {
+      success: true,
+      volume: vol,
+      media: null,
+      activeAudioApps: [],
+    };
+  }
+}
+
+/**
  * Handle high-level media command.
  */
 export async function executeMediaAction(action, value) {
   switch (action) {
+    case 'status':
+    case 'info':
+      return await getMediaStatus();
     case 'pause':
     case 'stop':
       return await stopMedia();

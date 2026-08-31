@@ -125,6 +125,38 @@ switch ($Action.ToLower()) {
         [AudioControllerBridge.AudioOps]::SendMediaKey(177)
         Write-Output "prev_sent"
     }
+    "status" {
+        $vol = [AudioControllerBridge.AudioOps]::GetMasterVolume()
+        $volRound = [math]::Round($vol)
+        $mediaInfo = $null
+        try {
+            [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media, ContentType=WindowsRuntime] | Out-Null
+            $asyncOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
+            $mgr = $asyncOp.GetAwaiter().GetResult()
+            $session = $mgr.GetCurrentSession()
+            if ($session) {
+                $props = $session.TryGetMediaPropertiesAsync().GetAwaiter().GetResult()
+                $mediaInfo = @{
+                    title = $props.Title
+                    artist = $props.Artist
+                    album = $props.AlbumTitle
+                    app = $session.SourceAppId
+                }
+            }
+        } catch {}
+
+        $audioApps = @()
+        Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match "spotify|chrome|msedge|brave|vlc|itunes" } | ForEach-Object {
+            if ($audioApps -notcontains $_.ProcessName) { $audioApps += $_.ProcessName }
+        }
+
+        $result = @{
+            volume = $volRound
+            media = $mediaInfo
+            activeAudioApps = $audioApps
+        }
+        $result | ConvertTo-Json -Compress
+    }
     default {
         Write-Output "unknown_action"
     }

@@ -42,9 +42,10 @@
 - [ ] Deep multi-source web research & structured summarization
 - [ ] Automated form filling & file downloading
 
-### Level 4 — Personal Assistant & Memory `[NEXT UPGRADE]`
-- [ ] Short-term context memory (multi-turn conversation history within session)
-- [ ] Task memory (tracking active goals, retry counts, execution context)
+### Level 4 — Personal Assistant & Memory `[IN PROGRESS]`
+- [x] Short-term context memory (multi-turn conversation turns persisted in SQLite `conversation_turns`)
+- [x] Contextual target tracking (`last_target`, `last_intent`, `last_url` in SQLite `agent_memory`)
+- [x] Windows Media & Audio Session Status Query (`media_status` via WinRT GSMTC & CoreAudio)
 - [ ] Long-term user preferences memory (saved custom settings, aliases, default apps)
 - [ ] Knowledge memory (explicit facts & notes saved by user)
 - [ ] Voice input (Speech-to-Text) & Voice output (Text-to-Speech)
@@ -79,3 +80,8 @@
 - **Feature 1 (System Media & Master Volume Controller):** Built `src/system/mediaController.js` using Windows CoreAudio COM interface for precise scalar volume setting (0–100%) and User32 virtual media key simulation for Play, Pause, Stop, Next, and Previous track control.
 - **Feature 2 (Native Windows App Launcher & Manager):** Built `src/system/appLauncher.js` with application alias registry, background process spawning, verification against `Get-Process`, and process termination (`app_close`).
 - **Feature 3 (Action Dispatch & Fast Summaries):** Integrated `media_control`, `app_launch`, and `app_close` in `src/executor/actionHandlers.js` and `src/executor/taskRunner.js` with instant zero-latency local summaries.
+
+### Session 2 (August 31, 2026):
+- **Feature 1 (Real-Time Windows Media & Audio Session Status):** Added `getMediaStatus()` in `src/system/mediaController.js` and `audioBridge.ps1` querying Windows WinRT Global System Media Transport Controls (GSMTC) + active audio processes (Spotify, Chrome, Edge, VLC), returning exact song title, artist, volume, and active media apps.
+- **Feature 2 (Contextual Multi-Turn Memory Layer):** Built `src/storage/memory.js` with SQLite tables `agent_memory` and `conversation_turns` to track short-term conversation context, last referenced target entities (`last_target`), and multi-turn execution history.
+- **Feature 3 (Regression & Additive Verification):** Executed full 11-step regression and upgrade test suite confirming 100% pass across media control, volume, laptop app launching, contextual app termination, and universal website opening.
