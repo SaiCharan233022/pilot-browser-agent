@@ -189,8 +189,8 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 4. Open App or Web Service / Any Website
-  const openMatch = cmd.match(/^open\s+([a-z0-9\s._:\/-]+)$/i);
+  // 4. Open / Launch / Start App or Web Service / Any Website
+  const openMatch = cmd.match(/^(?:open(?:\s+up|\s+the|\s+app|\s+my)?|launch(?:\s+the|\s+app)?|start(?:\s+the|\s+app)?)\s+([a-z0-9\s._:\/-]+)$/i);
   if (openMatch && !cmd.includes('and')) {
     const target = openMatch[1].trim();
     const targetLower = target.toLowerCase();
