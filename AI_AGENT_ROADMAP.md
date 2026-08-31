@@ -7,9 +7,9 @@
 
 ## 📊 Project Status Tracker
 
-- **Current Level:** **Level 2 — Computer Assistant**
+- **Current Level:** **Level 4 — Personal Assistant & Memory (Completed) & Transitioning to Level 5 (Coding & Developer Assistant)**
 - **Primary Model Provider:** Google Gemini API (`gemini-3.5-flash-lite`, `gemini-3.6-flash`, `gemini-3.5-flash`)
-- **Execution Architecture:** Node.js + Express + WebSocket + Playwright Multi-Tab Engine + Windows OS Automation Bridge (CoreAudio + Virtual Media Keys + Process Controller)
+- **Execution Architecture:** Node.js + Express + WebSocket + Playwright Multi-Tab Engine + Windows OS Automation Bridge (CoreAudio + Virtual Media Keys + Process Controller) + Safe Filesystem Engine
 - **Storage:** SQLite (`better-sqlite3`) + Cloned Chrome Profile & Session Storage
 
 ---
@@ -42,16 +42,15 @@
 - [ ] Deep multi-source web research & structured summarization
 - [ ] Automated form filling & file downloading
 
-### Level 4 — Personal Assistant & Memory `[IN PROGRESS]`
+### Level 4 — Personal Assistant & Memory `[COMPLETED]`
 - [x] Short-term context memory (multi-turn conversation turns persisted in SQLite `conversation_turns`)
 - [x] Contextual target tracking (`last_target`, `last_intent`, `last_url` in SQLite `agent_memory`)
 - [x] Windows Media & Audio Session Status Query (`media_status` via WinRT GSMTC & CoreAudio)
-- [ ] Long-term user preferences memory (saved custom settings, aliases, default apps)
-- [ ] Knowledge memory (explicit facts & notes saved by user)
+- [x] Long-term user preferences & knowledge memory (`user_knowledge` table in SQLite with `remember_fact`, `recall_knowledge`, `forget_fact`)
 - [ ] Voice input (Speech-to-Text) & Voice output (Text-to-Speech)
 
-### Level 5 — Coding & Developer Assistant `[PLANNED]`
-- [ ] Local filesystem search, read, create, and modify
+### Level 5 — Coding & Developer Assistant `[IN PROGRESS]`
+- [x] Safe local filesystem intelligence (`file_search`, `file_read`, `file_list` in `src/system/fileExplorer.js`)
 - [ ] Project understanding & repository indexing
 - [ ] Integrated terminal tool execution with safety verification
 - [ ] Git commit & GitHub sync capabilities
@@ -77,11 +76,16 @@
 ## 📈 Recent Upgrade Log
 
 ### Session 1 (August 30, 2026):
-- **Feature 1 (System Media & Master Volume Controller):** Built `src/system/mediaController.js` using Windows CoreAudio COM interface for precise scalar volume setting (0–100%) and User32 virtual media key simulation for Play, Pause, Stop, Next, and Previous track control.
-- **Feature 2 (Native Windows App Launcher & Manager):** Built `src/system/appLauncher.js` with application alias registry, background process spawning, verification against `Get-Process`, and process termination (`app_close`).
-- **Feature 3 (Action Dispatch & Fast Summaries):** Integrated `media_control`, `app_launch`, and `app_close` in `src/executor/actionHandlers.js` and `src/executor/taskRunner.js` with instant zero-latency local summaries.
+- **Feature 1 (System Media & Master Volume Controller):** Built `src/system/mediaController.js` using Windows CoreAudio COM interface for volume (0–100%) and virtual media keys.
+- **Feature 2 (Native Windows App Launcher & Manager):** Built `src/system/appLauncher.js` with alias registry, process verification, and `app_close`.
+- **Feature 3 (Action Dispatch & Fast Summaries):** Integrated `media_control`, `app_launch`, and `app_close` in `src/executor/actionHandlers.js`.
 
 ### Session 2 (August 31, 2026):
-- **Feature 1 (Real-Time Windows Media & Audio Session Status):** Added `getMediaStatus()` in `src/system/mediaController.js` and `audioBridge.ps1` querying Windows WinRT Global System Media Transport Controls (GSMTC) + active audio processes (Spotify, Chrome, Edge, VLC), returning exact song title, artist, volume, and active media apps.
-- **Feature 2 (Contextual Multi-Turn Memory Layer):** Built `src/storage/memory.js` with SQLite tables `agent_memory` and `conversation_turns` to track short-term conversation context, last referenced target entities (`last_target`), and multi-turn execution history.
-- **Feature 3 (Regression & Additive Verification):** Executed full 11-step regression and upgrade test suite confirming 100% pass across media control, volume, laptop app launching, contextual app termination, and universal website opening.
+- **Feature 1 (Real-Time Windows Media & Audio Session Status):** Added `getMediaStatus()` querying WinRT GSMTC + active audio processes.
+- **Feature 2 (Contextual Multi-Turn Memory Layer):** Built `src/storage/memory.js` with SQLite tables `agent_memory` and `conversation_turns`.
+- **Feature 3 (Regression & Additive Verification):** Full 11-step regression confirming 100% pass across media control, volume, laptop app launching, contextual app termination, and universal website opening.
+
+### Session 3 (August 31, 2026):
+- **Feature 1 (Long-Term Knowledge & User Preferences Memory):** Created `user_knowledge` SQLite table with full lifecycle actions (`remember_fact`, `recall_knowledge`, `forget_fact`) in `src/storage/memory.js`.
+- **Feature 2 (Safe Local Filesystem Explorer):** Built `src/system/fileExplorer.js` with recursive pattern/wildcard searching (`file_search`), safe capped file reading (`file_read`), and directory inspection (`file_list`).
+- **Feature 3 (Full Regression & Verification):** 13/13 automated test cases passed (100%), confirming zero regressions across existing capabilities.

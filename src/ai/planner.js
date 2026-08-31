@@ -30,6 +30,13 @@ export async function createPlan(command) {
       mediaAction: step.mediaAction || null,
       appName: step.appName || null,
       key: step.key || null,
+      content: step.content || null,
+      query: step.query || null,
+      pattern: step.pattern || null,
+      baseDirQuery: step.baseDirQuery || null,
+      filePath: step.filePath || null,
+      dirQuery: step.dirQuery || null,
+      targetName: step.targetName || null,
       url: step.url || null,
       selector: step.selector || null,
       text: step.text || null,
@@ -37,12 +44,12 @@ export async function createPlan(command) {
       amount: step.amount ?? null,
       description: step.description || `Step ${index + 1}`,
       sensitive: false, // Full autopilot - no approval pauses
-      status: 'pending', // pending | running | completed | failed | skipped
+      status: 'pending',
       result: null,
       screenshot: null,
       timestamp: null,
     })),
-    status: 'planned', // planned | running | completed | failed | cancelled
+    status: 'planned',
     createdAt: new Date().toISOString(),
     completedAt: null,
   };
@@ -124,86 +131,170 @@ function resolveUrl(name) {
 }
 
 /**
- * High-speed local fast-path parser for system, volume, and desktop app actions.
+ * High-speed local fast-path parser for system, memory, filesystem, and desktop actions.
  */
 function getFastPathPlan(rawCmd) {
   if (!rawCmd) return null;
-  const cmd = rawCmd.trim().toLowerCase();
+  const cmd = rawCmd.trim();
+  const lower = cmd.toLowerCase();
 
   // 1. Compound Open and Play
-  if (cmd.includes('open and play') || (cmd.includes('open') && cmd.includes('play') && cmd.includes('song'))) {
+  if (lower.includes('open and play') || (lower.includes('open') && lower.includes('play') && lower.includes('song'))) {
     return {
       summary: 'Open Spotify and play current song',
       steps: [{
         id: 1,
         action: 'open_and_play',
         appName: 'spotify',
-        description: 'Open Spotify and trigger playback of active song',
+        description: 'Launch Spotify and trigger playback',
       }],
     };
   }
 
-  // 2. Open App and Write/Type Text (e.g. "open notepad and write Hello from Pilot AI")
-  const openWriteMatch = cmd.match(/^open\s+([a-z\s]+?)\s+(?:and\s+)?(?:write|type)\s+(.+)$/i);
-  if (openWriteMatch) {
-    const targetApp = openWriteMatch[1].trim();
-    const rawTextMatch = rawCmd.match(/^open\s+[a-z\s]+?\s+(?:and\s+)?(?:write|type)\s+(.+)$/i);
-    const textToWrite = rawTextMatch ? rawTextMatch[1].trim() : openWriteMatch[2].trim();
+  // 2. Notepad automation with typing
+  const notepadMatch = lower.match(/(?:open|start|launch)\s+notepad\s+(?:and\s+write|and\s+type|write|type)\s+(.+)/i);
+  if (notepadMatch) {
+    const textToWrite = cmd.slice(cmd.toLowerCase().indexOf(notepadMatch[1].toLowerCase())).trim();
     return {
-      summary: `Open ${targetApp} and write text`,
+      summary: `Open Notepad and type: "${textToWrite}"`,
       steps: [
         {
           id: 1,
           action: 'app_launch',
-          appName: targetApp,
-          description: `Open ${targetApp} application`,
+          appName: 'notepad',
+          description: 'Launch Notepad application',
         },
         {
           id: 2,
           action: 'desktop_type',
-          appName: targetApp,
+          appName: 'notepad',
           text: textToWrite,
-          description: `Type text into ${targetApp}`,
+          description: `Type text into Notepad`,
         },
       ],
     };
   }
 
-  // 3. Web Search Queries (e.g. "search for james webb telescope", "google latest AI news")
-  const searchMatch = cmd.match(/^(?:search(?:\s+(?:for|on\s+google\s+for|on\s+web\s+for))?|google)\s+(.+)$/i);
-  if (searchMatch && !cmd.startsWith('open')) {
-    const query = searchMatch[1].trim();
-    const encoded = encodeURIComponent(query);
-    const searchUrl = `https://www.google.com/search?q=${encoded}`;
+  // 3. Knowledge Memory: Remember
+  const remMatch = lower.match(/^remember(?:\s+that)?\s+(?:my\s+)?([^:]+?)(?:\s+is|\s+as|\s*:\s*)\s*(.+)$/i);
+  if (remMatch) {
+    const key = remMatch[1].trim();
+    const content = remMatch[2].trim();
     return {
-      summary: `Search for "${query}"`,
-      steps: [
-        {
-          id: 1,
-          action: 'navigate',
-          targetName: `Google Search: "${query}"`,
-          url: searchUrl,
-          description: `Search Google for "${query}" on screen`,
-        },
-      ],
+      summary: `Remember that ${key} is ${content}`,
+      steps: [{
+        id: 1,
+        action: 'remember_fact',
+        key,
+        content,
+        description: `Save knowledge fact: ${key}`,
+      }],
+    };
+  }
+  const noteMatch = lower.match(/^(?:save\s+note|remember|take\s+a\s+note)\s*:\s*(.+)$/i);
+  if (noteMatch) {
+    const noteText = noteMatch[1].trim();
+    return {
+      summary: `Save note: "${noteText}"`,
+      steps: [{
+        id: 1,
+        action: 'remember_fact',
+        key: 'note_' + Date.now().toString().slice(-4),
+        content: noteText,
+        description: `Save user note`,
+      }],
     };
   }
 
-  // 4. Open / Launch / Start App or Web Service / Any Website
-  const openMatch = cmd.match(/^(?:open(?:\s+up|\s+the|\s+app|\s+my)?|launch(?:\s+the|\s+app)?|start(?:\s+the|\s+app)?)\s+([a-z0-9\s._:\/-]+)$/i);
-  if (openMatch && !cmd.includes('and')) {
+  // 4. Knowledge Memory: Recall
+  if (
+    lower.match(/^what\s+is\s+my\s+([^?]+)/i) ||
+    lower.match(/^recall\s+([^?]+)/i) ||
+    lower.match(/^what\s+do\s+you\s+remember(?:\s+about\s+me)?/i) ||
+    lower.match(/^(?:show|list|get)\s+(?:my\s+)?(?:knowledge|notes|facts|preferences|saved\s+facts)/i)
+  ) {
+    const keyMatch = lower.match(/^(?:what\s+is\s+my|recall)\s+([^?]+)/i);
+    const key = keyMatch ? keyMatch[1].trim() : null;
+    return {
+      summary: key ? `Recall knowledge for "${key}"` : 'Retrieve all stored knowledge and preferences',
+      steps: [{
+        id: 1,
+        action: 'recall_knowledge',
+        key,
+        description: key ? `Query knowledge key: ${key}` : 'List all stored knowledge facts',
+      }],
+    };
+  }
+
+  // 5. Knowledge Memory: Forget
+  const forgetMatch = lower.match(/^(?:forget|delete\s+note|remove\s+knowledge)\s+(?:my\s+)?([^?]+)/i);
+  if (forgetMatch) {
+    const key = forgetMatch[1].trim();
+    return {
+      summary: `Forget knowledge fact "${key}"`,
+      steps: [{
+        id: 1,
+        action: 'forget_fact',
+        key,
+        description: `Delete knowledge key: ${key}`,
+      }],
+    };
+  }
+
+  // 6. Filesystem: Search Files
+  const searchMatch = lower.match(/(?:find|search(?:\s+for)?)\s+files?(?:\s+named|\s+with\s+name)?\s+([^\s]+)(?:\s+in\s+([a-z0-9_.-]+))?/i);
+  if (searchMatch) {
+    const pattern = searchMatch[1].trim();
+    const baseDir = (searchMatch[2] || 'project').trim();
+    return {
+      summary: `Search for files named "${pattern}" in ${baseDir}`,
+      steps: [{
+        id: 1,
+        action: 'file_search',
+        pattern,
+        baseDirQuery: baseDir,
+        description: `Search files matching ${pattern} in ${baseDir}`,
+      }],
+    };
+  }
+
+  // 7. Filesystem: Read File
+  const readMatch = lower.match(/(?:read|show|view|display)(?:\s+the\s+contents\s+of)?(?:\s+file)?\s+([a-z0-9_./\\-]+\.[a-z0-9]+)/i);
+  if (readMatch) {
+    const filePath = readMatch[1].trim();
+    return {
+      summary: `Read file: ${filePath}`,
+      steps: [{
+        id: 1,
+        action: 'file_read',
+        filePath,
+        description: `Read file contents of ${filePath}`,
+      }],
+    };
+  }
+
+  // 8. Filesystem: List Directory
+  const listMatch = lower.match(/(?:list|show)\s+(?:all\s+)?files(?:\s+in\s+(?:the\s+)?([a-z0-9_./\\-]+))?/i);
+  if (listMatch) {
+    const dirQuery = (listMatch[1] || 'project').trim();
+    return {
+      summary: `List files in ${dirQuery}`,
+      steps: [{
+        id: 1,
+        action: 'file_list',
+        dirQuery,
+        description: `List directory contents of ${dirQuery}`,
+      }],
+    };
+  }
+
+  // 9. Unified Open / Launch System
+  const openMatch = lower.match(/^(?:open|launch|start)(?:\s+(?:the|app|my|up))?\s+(.+)$/i);
+  if (openMatch) {
     const target = openMatch[1].trim();
-    const targetLower = target.toLowerCase();
 
-    // 1. Explicit URLs & Domain extensions (e.g. https://..., www..., leetcode.com, github.com/trending, or ends with 'website' / 'site')
-    const isExplicitUrl = targetLower.startsWith('http://') ||
-                          targetLower.startsWith('https://') ||
-                          targetLower.startsWith('www.') ||
-                          /\.[a-z]{2,}(\/.*)?$/i.test(targetLower) ||
-                          targetLower.endsWith(' website') ||
-                          targetLower.endsWith(' site');
-
-    if (isExplicitUrl) {
+    // 1. Explicit URLs
+    if (target.startsWith('http://') || target.startsWith('https://') || target.startsWith('www.') || target.includes('.com') || target.includes('.org') || target.includes('.net') || target.includes('.io') || target.includes('.app') || target.includes('.to') || target.includes('.ge') || target.includes('.tv')) {
       const targetUrl = resolveUrl(target);
       return {
         summary: `Open ${target}`,
@@ -217,21 +308,23 @@ function getFastPathPlan(rawCmd) {
       };
     }
 
-    // 2. Check if it is an INSTALLED LAPTOP APPLICATION on this computer
-    const installedApp = findInstalledAppSync(targetLower);
-    if (installedApp) {
+    // 2. Installed LAPTOP APPS
+    const appMatch = findInstalledAppSync(target);
+    const isKnownDesktop = DESKTOP_APPS.includes(target) || appMatch !== null;
+
+    if (isKnownDesktop) {
       return {
-        summary: `Open ${installedApp.Name || target}`,
+        summary: `Open ${target}`,
         steps: [{
           id: 1,
           action: 'app_launch',
           appName: target,
-          description: `Open ${installedApp.Name || target} visibly on desktop`,
+          description: `Launch ${target} on your laptop`,
         }],
       };
     }
 
-    // 3. Otherwise it is a WEBSITE ON THE INTERNET (e.g. Gemini, Cricbuzz, GeeksforGeeks, KissAnime, HiAnime, AniSuge, etc.)
+    // 3. Otherwise it is a WEBSITE ON THE INTERNET
     const targetUrl = resolveUrl(target);
     return {
       summary: `Open ${target}`,
@@ -245,8 +338,8 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 4. Close App / Close It / Close Active
-  const closeMatch = cmd.match(/^close(?:\s+([a-z0-9\s._-]+))?$/i);
+  // 10. Close App / Close It / Close Active
+  const closeMatch = lower.match(/^close(?:\s+([a-z0-9\s._-]+))?$/i);
   if (closeMatch) {
     const appName = (closeMatch[1] || 'it').trim();
     return {
@@ -260,8 +353,8 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 5. Volume Set
-  const volMatch = cmd.match(/(?:set\s+)?volume\s+(?:to\s+)?(\d+)\s*%?/i);
+  // 11. Volume Set
+  const volMatch = lower.match(/(?:set\s+)?volume\s+(?:to\s+)?(\d+)\s*%?/i);
   if (volMatch) {
     const amount = parseInt(volMatch[1], 10);
     return {
@@ -276,8 +369,8 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 6. Media Controls
-  if (cmd === 'pause' || cmd === 'pause song' || cmd === 'pause music' || cmd === 'stop music' || cmd === 'stop song') {
+  // 12. Media Controls
+  if (lower === 'pause' || lower === 'pause song' || lower === 'pause music' || lower === 'stop music' || lower === 'stop song') {
     return {
       summary: 'Pause media playback',
       steps: [{
@@ -288,7 +381,7 @@ function getFastPathPlan(rawCmd) {
       }],
     };
   }
-  if (cmd === 'play' || cmd === 'resume' || cmd === 'resume song' || cmd === 'play again') {
+  if (lower === 'play' || lower === 'resume' || lower === 'resume song' || lower === 'play again') {
     return {
       summary: 'Resume media playback',
       steps: [{
@@ -299,7 +392,7 @@ function getFastPathPlan(rawCmd) {
       }],
     };
   }
-  if (cmd === 'next' || cmd === 'next song' || cmd === 'next track') {
+  if (lower === 'next' || lower === 'next song' || lower === 'next track') {
     return {
       summary: 'Skip to next track',
       steps: [{
@@ -310,7 +403,7 @@ function getFastPathPlan(rawCmd) {
       }],
     };
   }
-  if (cmd === 'prev' || cmd === 'previous' || cmd === 'previous song' || cmd === 'previous track') {
+  if (lower === 'prev' || lower === 'previous' || lower === 'previous song' || lower === 'previous track') {
     return {
       summary: 'Go to previous track',
       steps: [{
@@ -321,7 +414,7 @@ function getFastPathPlan(rawCmd) {
       }],
     };
   }
-  if (cmd === 'mute') {
+  if (lower === 'mute') {
     return {
       summary: 'Mute system audio',
       steps: [{
@@ -332,7 +425,7 @@ function getFastPathPlan(rawCmd) {
       }],
     };
   }
-  if (cmd === 'unmute') {
+  if (lower === 'unmute') {
     return {
       summary: 'Unmute system audio',
       steps: [{
@@ -344,17 +437,17 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 7. Media and Volume Status Queries
+  // 13. Media and Volume Status Queries
   if (
-    cmd === 'what song is playing' ||
-    cmd === 'what is playing' ||
-    cmd === 'current song' ||
-    cmd === 'media status' ||
-    cmd === 'check media' ||
-    cmd === 'audio status' ||
-    cmd === 'volume status' ||
-    cmd === 'what is the volume' ||
-    cmd === 'check volume'
+    lower === 'what song is playing' ||
+    lower === 'what is playing' ||
+    lower === 'current song' ||
+    lower === 'media status' ||
+    lower === 'check media' ||
+    lower === 'audio status' ||
+    lower === 'volume status' ||
+    lower === 'what is the volume' ||
+    lower === 'check volume'
   ) {
     return {
       summary: 'Check system volume and active media',
@@ -376,6 +469,8 @@ function validateAction(action) {
   const validActions = [
     'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
     'desktop_focus', 'desktop_type', 'desktop_key',
+    'remember_fact', 'recall_knowledge', 'forget_fact',
+    'file_search', 'file_read', 'file_list',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',
   ];

@@ -1,6 +1,6 @@
 /**
- * Action Handlers — maps plan actions to browser controller methods.
- * Each handler executes a single browser action and returns a result.
+ * Action Handlers — maps plan actions to browser and system controller methods.
+ * Each handler executes a single action and returns a result.
  */
 
 import * as browser from '../browser/controller.js';
@@ -8,6 +8,8 @@ import { analyzeScreenshot, findSelector } from '../ai/gemini.js';
 import { executeMediaAction } from '../system/mediaController.js';
 import { launchApp, closeApp, getRunningApps } from '../system/appLauncher.js';
 import { focusWindow, typeDesktopText, sendDesktopKey, openAndPlay } from '../system/desktopController.js';
+import { saveKnowledge, recallKnowledge, getAllKnowledge, forgetKnowledge, searchKnowledge } from '../storage/memory.js';
+import { searchFiles, readFileContent, listDirectory } from '../system/fileExplorer.js';
 
 /**
  * Execute a single action step.
@@ -100,83 +102,122 @@ const actionMap = {
   },
 
   /**
-   * Type text into desktop application.
+   * Type text into active desktop application.
    */
   desktop_type: async (step) => {
-    return await typeDesktopText(step.text, step.appName || '');
+    const target = step.appName || 'active';
+    const text = step.text || '';
+    return await typeDesktopText(target, text);
   },
 
   /**
-   * Send keyboard key to desktop application.
+   * Send keystroke or hotkey to desktop.
    */
   desktop_key: async (step) => {
-    return await sendDesktopKey(step.key || step.text || 'enter', step.appName || '');
+    const target = step.appName || 'active';
+    const key = step.key || step.text || 'enter';
+    return await sendDesktopKey(target, key);
+  },
+
+  /**
+   * Remember user fact or preference.
+   */
+  remember_fact: async (step) => {
+    return saveKnowledge(step.key || step.text, step.content || step.text, step.category || 'fact');
+  },
+
+  /**
+   * Recall user knowledge or preferences.
+   */
+  recall_knowledge: async (step) => {
+    if (step.key) {
+      const match = recallKnowledge(step.key);
+      if (match) {
+        return { success: true, match, message: `${match.key}: ${match.content}` };
+      }
+    }
+    if (step.query) {
+      const matches = searchKnowledge(step.query);
+      return { success: true, count: matches.length, matches };
+    }
+    const all = getAllKnowledge();
+    return { success: true, count: all.length, knowledge: all };
+  },
+
+  /**
+   * Forget a fact or preference.
+   */
+  forget_fact: async (step) => {
+    return forgetKnowledge(step.key || step.text);
+  },
+
+  /**
+   * Search for local files matching wildcard or extension.
+   */
+  file_search: async (step) => {
+    return await searchFiles(step.pattern || step.text || '*', step.baseDirQuery || 'project', step.maxResults || 25);
+  },
+
+  /**
+   * Read contents of a local file safely.
+   */
+  file_read: async (step) => {
+    return await readFileContent(step.filePath || step.text, step.maxLines || 150);
+  },
+
+  /**
+   * List folder contents.
+   */
+  file_list: async (step) => {
+    return await listDirectory(step.dirQuery || step.text || 'project');
   },
 
   /**
    * Navigate to a URL.
    */
   navigate: async (step, context) => {
-    if (!step.url) return { success: false, error: 'No URL provided for navigate action' };
+    if (!step.url) {
+      return { success: false, error: 'URL required for navigate action' };
+    }
     return await browser.navigate(step.url, context.taskId);
   },
 
   /**
-   * Click on an element.
+   * Click an element.
    */
   click: async (step, context) => {
     if (!step.selector) {
-      const screenshot = await browser.screenshot(null, context.taskId);
-      const pageInfo = await browser.getPageInfo(context.taskId);
-      const selectorResult = await findSelector(step.description, screenshot, pageInfo);
-      if (selectorResult.selectors && selectorResult.selectors.length > 0) {
-        step.selector = selectorResult.selectors[0].selector;
-      } else {
-        return { success: false, error: 'No selector provided and AI could not find the element' };
-      }
+      return { success: false, error: 'Selector required for click action' };
     }
-    return await browser.click(step.selector, context.taskId);
+    return await browser.click(step.selector, 8000, context.taskId);
   },
 
   /**
-   * Type text into an input.
+   * Type text into an input element.
    */
   type: async (step, context) => {
-    if (!step.selector || !step.text) {
-      if (!step.text) return { success: false, error: 'No text provided for type action' };
-      const screenshot = await browser.screenshot(null, context.taskId);
-      const pageInfo = await browser.getPageInfo(context.taskId);
-      const selectorResult = await findSelector(step.description, screenshot, pageInfo);
-      if (selectorResult.selectors && selectorResult.selectors.length > 0) {
-        step.selector = selectorResult.selectors[0].selector;
-      } else {
-        return { success: false, error: 'No selector provided and AI could not find the input' };
-      }
+    if (!step.selector) {
+      return { success: false, error: 'Selector required for type action' };
     }
-    return await browser.type(step.selector, step.text, true, context.taskId);
+    return await browser.type(step.selector, step.text || '', context.taskId);
   },
 
   /**
-   * Take a screenshot and analyze it with AI vision.
+   * Visual AI: Capture page screenshot, send to Gemini Vision, and extract data.
    */
   screenshot_and_extract: async (step, context) => {
-    const screenshotBuffer = await browser.screenshot(null, context.taskId);
-    const pageInfo = await browser.getPageInfo(context.taskId);
+    const screenshot = await browser.screenshot(context.taskId);
+    if (!screenshot) {
+      return { success: false, error: 'Failed to capture screenshot' };
+    }
 
-    const analysis = await analyzeScreenshot(screenshotBuffer, {
-      url: pageInfo.url,
-      title: pageInfo.title,
-      task: context.task || '',
-      stepDescription: step.description || 'Analyze the page',
-    });
+    const prompt = step.text || `Analyze this web page for the task: "${context.task || 'extract main data'}" and provide the exact answer clearly.`;
+    const analysis = await analyzeScreenshot(screenshot, prompt);
 
     return {
       success: true,
-      analysis,
-      extractedData: analysis.extractedData,
-      pageDescription: analysis.pageDescription,
-      nextAction: analysis.nextAction,
-      error: analysis.error,
+      extractedData: analysis,
+      screenshot: screenshot.toString('base64'),
     };
   },
 

@@ -279,8 +279,45 @@ export async function runTask(command, options = {}) {
       summary = `Closed ${lastStep.appName || 'application'}.`;
     } else if (lastStep.action === 'desktop_type') {
       summary = `Typed into ${lastStep.appName || 'application'}.`;
-    } else if (lastStep.action === 'desktop_key') {
-      summary = `Executed ${lastStep.key || 'key command'}.`;
+    } else if (lastStep.action === 'remember_fact') {
+      const res = lastStep.result || {};
+      summary = `Saved to memory: "${res.key || lastStep.key}" is "${res.content || lastStep.content}".`;
+    } else if (lastStep.action === 'recall_knowledge') {
+      const res = lastStep.result || {};
+      if (res.match) {
+        summary = `Your ${res.match.key} is: ${res.match.content}`;
+      } else if (res.knowledge && res.knowledge.length > 0) {
+        const list = res.knowledge.map(k => `• ${k.key}: ${k.content}`).join('\n');
+        summary = `Here is what I remember:\n${list}`;
+      } else {
+        summary = `I don't have any saved knowledge for that yet. You can tell me "Remember that my <item> is <value>".`;
+      }
+    } else if (lastStep.action === 'forget_fact') {
+      const res = lastStep.result || {};
+      summary = res.success ? `Forgot knowledge for "${lastStep.key}".` : `No stored knowledge found for "${lastStep.key}".`;
+    } else if (lastStep.action === 'file_search') {
+      const res = lastStep.result || {};
+      if (res.files && res.files.length > 0) {
+        const fileList = res.files.map(f => `📄 ${f.relativePath} (${f.size}, modified ${f.modified})`).join('\n');
+        summary = `Found ${res.count} file(s) in ${res.directory}:\n\n${fileList}`;
+      } else {
+        summary = `No files found matching "${lastStep.pattern || '*'}" in ${res.directory || 'the directory'}.`;
+      }
+    } else if (lastStep.action === 'file_read') {
+      const res = lastStep.result || {};
+      if (res.success) {
+        summary = `📄 ${res.name} (${res.displayedLines}/${res.totalLines} lines):\n\n\`\`\`\n${res.content}\n\`\`\``;
+      } else {
+        summary = `Could not read file: ${res.error || 'Unknown error'}`;
+      }
+    } else if (lastStep.action === 'file_list') {
+      const res = lastStep.result || {};
+      if (res.items && res.items.length > 0) {
+        const itemsList = res.items.map(i => `${i.type === 'folder' ? '📁' : '📄'} ${i.name}`).join('\n');
+        summary = `Contents of ${res.directory} (${res.totalItems} items):\n\n${itemsList}`;
+      } else {
+        summary = `Directory is empty or could not be accessed.`;
+      }
     } else {
       summary = `Task completed successfully.`;
     }
