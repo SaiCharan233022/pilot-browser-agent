@@ -11,6 +11,7 @@ import { initGemini } from './ai/gemini.js';
 import { initDatabase } from './storage/history.js';
 import { ensureDataDirs } from './browser/profile.js';
 import { setStatusCallback } from './browser/controller.js';
+import { getInstalledApps } from './system/appLauncher.js';
 
 const PORT = parseInt(process.env.PORT) || 3000;
 
@@ -36,6 +37,10 @@ async function main() {
   } else {
     console.log('⚠️  No Gemini API key found. Set it in Settings after launching.');
   }
+
+  // 4. Preload installed laptop applications
+  await getInstalledApps();
+  console.log('💻 Laptop installed apps indexed');
 
   // 4. Start the server
   const { httpServer, broadcast } = createAppServer(PORT);

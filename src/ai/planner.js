@@ -5,6 +5,7 @@
 import { planTask as geminiPlan } from './gemini.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getLastActiveTarget } from '../storage/memory.js';
+import { findInstalledAppSync } from '../system/appLauncher.js';
 
 /**
  * Create an execution plan from a natural language command.
@@ -194,32 +195,53 @@ function getFastPathPlan(rawCmd) {
     const target = openMatch[1].trim();
     const targetLower = target.toLowerCase();
 
-    // If it is an installed native desktop application
-    if (DESKTOP_APPS.includes(targetLower)) {
+    // 1. Explicit Web Services & URLs (e.g. gemini, cricbuzz, geeksforgeeks, leetcode, http://, .com)
+    if (WEB_SERVICES[targetLower] ||
+        targetLower.startsWith('http://') ||
+        targetLower.startsWith('https://') ||
+        targetLower.startsWith('www.') ||
+        /\.[a-z]{2,}(\/.*)?$/i.test(targetLower) ||
+        targetLower.endsWith(' ai') ||
+        targetLower.endsWith(' website') ||
+        targetLower.endsWith(' site')) {
+      const targetUrl = resolveUrl(target);
       return {
         summary: `Open ${target}`,
         steps: [{
-          id: 1,
-          action: 'app_launch',
-          appName: target,
-          description: `Open ${target} visibly on desktop`,
-        }],
-      };
-    }
-
-    // Otherwise it is ALWAYS a Website / Web Service / AI Platform / Custom URL
-    const targetUrl = resolveUrl(target);
-    return {
-      summary: `Open ${target}`,
-      steps: [
-        {
           id: 1,
           action: 'navigate',
           targetName: target,
           url: targetUrl,
           description: `Open ${target} directly on screen`,
-        },
-      ],
+        }],
+      };
+    }
+
+    // 2. Installed internal laptop application (e.g. WhatsApp, Word, PowerPoint, Spotify, Notepad, Paint, AutoCAD, etc.)
+    const installedApp = findInstalledAppSync(targetLower);
+    if (installedApp) {
+      return {
+        summary: `Open ${installedApp.Name || target}`,
+        steps: [{
+          id: 1,
+          action: 'app_launch',
+          appName: target,
+          description: `Open ${installedApp.Name || target} visibly on desktop`,
+        }],
+      };
+    }
+
+    // 3. Otherwise default to website URL
+    const targetUrl = resolveUrl(target);
+    return {
+      summary: `Open ${target}`,
+      steps: [{
+        id: 1,
+        action: 'navigate',
+        targetName: target,
+        url: targetUrl,
+        description: `Open ${target} directly on screen`,
+      }],
     };
   }
 
