@@ -158,8 +158,49 @@ export async function listDirectory(dirQuery = 'project') {
   }
 }
 
+/**
+ * Safely create or edit a file with content.
+ */
+export async function writeFileContent(filePath, content = '', append = false, baseDirQuery = 'project') {
+  try {
+    let resolvedPath = filePath;
+    if (!isAbsolute(filePath)) {
+      const baseDir = resolveDirectory(baseDirQuery);
+      resolvedPath = resolve(baseDir, filePath);
+    }
+
+    // Safety checks against critical system files
+    const lower = resolvedPath.toLowerCase();
+    if (lower.includes('c:\\windows') || lower.includes('c:\\program files') || lower.endsWith('.exe') || lower.endsWith('.dll')) {
+      return { success: false, error: 'Writing to system directories or binary executables is blocked for safety.' };
+    }
+
+    const parentDir = resolve(resolvedPath, '..');
+    await fs.mkdir(parentDir, { recursive: true });
+
+    if (append) {
+      await fs.appendFile(resolvedPath, content, 'utf8');
+    } else {
+      await fs.writeFile(resolvedPath, content, 'utf8');
+    }
+
+    const stat = await fs.stat(resolvedPath);
+    return {
+      success: true,
+      path: resolvedPath,
+      name: basename(resolvedPath),
+      size: formatBytes(stat.size),
+      action: append ? 'appended' : 'created',
+      message: `File "${basename(resolvedPath)}" ${append ? 'appended' : 'saved'} successfully (${formatBytes(stat.size)}).`,
+    };
+  } catch (err) {
+    return { success: false, path: filePath, error: `Could not write file: ${err.message}` };
+  }
+}
+
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
+

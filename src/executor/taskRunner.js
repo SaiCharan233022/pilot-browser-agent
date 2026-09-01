@@ -249,7 +249,7 @@ export async function runTask(command, options = {}) {
     'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
     'desktop_focus', 'desktop_type', 'desktop_key',
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
-    'file_search', 'file_read', 'file_list', 'pdf_read',
+    'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
   ];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
@@ -349,12 +349,19 @@ export async function runTask(command, options = {}) {
       } else {
         summary = `❌ **Command Error:** \`${res.command}\`\n\n\`\`\`text\n${res.error || res.stderr || 'Execution failed'}\n\`\`\``;
       }
-    } else if (lastStep.action === 'pdf_read') {
+    } else if (lastStep.action === 'file_write') {
       const res = lastStep.result || {};
       if (res.success) {
-        summary = `📑 **PDF Extracted:** ${res.name} (${res.size}, ${res.charCount} chars):\n\n${res.content}`;
+        summary = `📝 **File Saved:** \`${res.name}\` (${res.size}) — ${res.message || 'File written successfully.'}`;
       } else {
-        summary = `Could not extract PDF: ${res.error || 'Unknown error'}`;
+        summary = `❌ Could not write file: ${res.error || 'Unknown error'}`;
+      }
+    } else if (lastStep.action === 'document_read' || lastStep.action === 'pdf_read') {
+      const res = lastStep.result || {};
+      if (res.success) {
+        summary = res.content || `📑 **Document Parsed:** ${res.name} (${res.size})`;
+      } else {
+        summary = `❌ Could not parse document: ${res.error || 'Unknown error'}`;
       }
     } else {
       summary = `Task completed successfully.`;

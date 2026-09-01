@@ -305,7 +305,24 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 8. Filesystem: List Directory
+  // 8. Filesystem: Create / Write File
+  const writeMatch = rawCmd.match(/^(?:create\s+file|write(?:\s+to)?\s+file|save(?:\s+to)?\s+file)\s+([a-z0-9_./\\-]+\.[a-z0-9]+)\s+(?:with\s+content|with\s+text|containing|:)\s*([\s\S]+)$/i);
+  if (writeMatch) {
+    const filePath = writeMatch[1].trim();
+    const content = writeMatch[2].trim();
+    return {
+      summary: `Create file "${filePath}" with specified content`,
+      steps: [{
+        id: 1,
+        action: 'file_write',
+        filePath,
+        content,
+        description: `Write content to ${filePath}`,
+      }],
+    };
+  }
+
+  // 9. Filesystem: List Directory
   const listMatch = lower.match(/(?:list|show)\s+(?:all\s+)?files(?:\s+in\s+(?:the\s+)?([a-z0-9_./\\-]+))?/i);
   if (listMatch) {
     const dirQuery = (listMatch[1] || 'project').trim();
@@ -320,7 +337,7 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 9. Desktop Screen Perception & Vision Inspection
+  // 10. Desktop Screen Perception & Vision Inspection
   if (
     lower.match(/^(?:what\s+is\s+on\s+my\s+screen|inspect\s+(?:my\s+)?screen|look\s+at\s+my\s+screen|what\s+is\s+on\s+desktop|summarize\s+(?:my\s+)?screen|take\s+a\s+screenshot)/i)
   ) {
@@ -335,9 +352,9 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 10. Safe Terminal & Command Execution
+  // 11. Safe Terminal & Command Execution
   const termMatch = lower.match(/^(?:run\s+command|execute\s+command|run\s+terminal|execute|run)\s+(.+)$/i);
-  if (termMatch && !lower.startsWith('open ') && !lower.startsWith('launch ') && !lower.startsWith('start ') && !lower.startsWith('play ') && !lower.startsWith('set ') && !lower.startsWith('find ') && !lower.startsWith('read ') && !lower.startsWith('list ')) {
+  if (termMatch && !lower.startsWith('open ') && !lower.startsWith('launch ') && !lower.startsWith('start ') && !lower.startsWith('play ') && !lower.startsWith('set ') && !lower.startsWith('find ') && !lower.startsWith('read ') && !lower.startsWith('list ') && !lower.startsWith('create ') && !lower.startsWith('write ')) {
     let commandToRun = rawCmd.slice(rawCmd.toLowerCase().indexOf(termMatch[1].toLowerCase())).trim();
     commandToRun = commandToRun.replace(/^[`"']+|[`"']+$/g, '');
     return {
@@ -351,17 +368,17 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
-  // 11. PDF Document Reader
-  const pdfMatch = lower.match(/(?:read|summarize|extract(?:\s+text\s+from)?)(?:\s+pdf)?\s+([a-z0-9_./\\-]+\.pdf)/i);
-  if (pdfMatch) {
-    const pdfPath = pdfMatch[1].trim();
+  // 12. Unified Document Intelligence (PDF, CSV, TSV, JSON, TXT)
+  const docMatch = lower.match(/(?:read|summarize|parse|extract(?:\s+data|\s+text\s+from)?)(?:\s+(?:document|spreadsheet|table|csv|tsv|json|pdf))?\s+([a-z0-9_./\\-]+\.(?:pdf|csv|tsv|json|txt|md|log))/i);
+  if (docMatch) {
+    const docPath = docMatch[1].trim();
     return {
-      summary: `Read and extract PDF document: ${pdfPath}`,
+      summary: `Parse and extract document: ${docPath}`,
       steps: [{
         id: 1,
-        action: 'pdf_read',
-        filePath: pdfPath,
-        description: `Extract text from ${pdfPath}`,
+        action: 'document_read',
+        filePath: docPath,
+        description: `Parse and summarize document ${docPath}`,
       }],
     };
   }
@@ -548,7 +565,7 @@ function validateAction(action) {
     'media_control', 'media_status', 'app_launch', 'app_close', 'open_and_play',
     'desktop_focus', 'desktop_type', 'desktop_key',
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
-    'file_search', 'file_read', 'file_list', 'pdf_read',
+    'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',

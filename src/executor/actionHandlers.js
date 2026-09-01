@@ -9,10 +9,11 @@ import { executeMediaAction } from '../system/mediaController.js';
 import { launchApp, closeApp, getRunningApps } from '../system/appLauncher.js';
 import { focusWindow, typeDesktopText, sendDesktopKey, openAndPlay } from '../system/desktopController.js';
 import { saveKnowledge, recallKnowledge, getAllKnowledge, forgetKnowledge, searchKnowledge, getUserInputs, searchConversationHistory } from '../storage/memory.js';
-import { searchFiles, readFileContent, listDirectory } from '../system/fileExplorer.js';
+import { searchFiles, readFileContent, writeFileContent, listDirectory } from '../system/fileExplorer.js';
 import { inspectScreen, captureScreen } from '../perception/screenCapture.js';
 import { executeTerminalCommand } from '../system/terminalRunner.js';
 import { extractPdfText } from '../system/pdfExtractor.js';
+import { parseDocument } from '../system/documentParser.js';
 
 /**
  * Execute a single action step.
@@ -181,6 +182,18 @@ const actionMap = {
   },
 
   /**
+   * Safe File Creator and Editor.
+   */
+  file_write: async (step) => {
+    return await writeFileContent(
+      step.filePath || step.name || step.targetName,
+      step.content || step.text || '',
+      !!step.append,
+      step.baseDirQuery || 'project'
+    );
+  },
+
+  /**
    * List folder contents.
    */
   file_list: async (step) => {
@@ -202,10 +215,20 @@ const actionMap = {
   },
 
   /**
-   * PDF Document Reader & Structured Extractor.
+   * Unified Document Intelligence Reader (PDF, CSV, JSON, Markdown, Text).
+   */
+  document_read: async (step) => {
+    return await parseDocument(step.filePath || step.text, {
+      maxLines: step.maxLines || 150,
+      baseDirQuery: step.baseDirQuery || 'project',
+    });
+  },
+
+  /**
+   * PDF Document Reader & Structured Extractor (backward-compatible alias).
    */
   pdf_read: async (step) => {
-    return await extractPdfText(step.filePath || step.text);
+    return await parseDocument(step.filePath || step.text);
   },
 
   /**
