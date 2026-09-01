@@ -7,13 +7,16 @@ import * as browser from '../browser/controller.js';
 import { analyzeScreenshot, findSelector } from '../ai/gemini.js';
 import { executeMediaAction } from '../system/mediaController.js';
 import { launchApp, closeApp, getRunningApps } from '../system/appLauncher.js';
-import { focusWindow, typeDesktopText, sendDesktopKey, openAndPlay } from '../system/desktopController.js';
+import { focusWindow, typeDesktopText, sendDesktopKey, openAndPlay, getClipboard, setClipboard, switchWindow } from '../system/desktopController.js';
 import { saveKnowledge, recallKnowledge, getAllKnowledge, forgetKnowledge, searchKnowledge, getUserInputs, searchConversationHistory } from '../storage/memory.js';
 import { searchFiles, readFileContent, writeFileContent, listDirectory } from '../system/fileExplorer.js';
 import { inspectScreen, captureScreen } from '../perception/screenCapture.js';
 import { executeTerminalCommand } from '../system/terminalRunner.js';
 import { extractPdfText } from '../system/pdfExtractor.js';
 import { parseDocument } from '../system/documentParser.js';
+import { getSystemInfo, getBatteryStatus } from '../system/systemInspector.js';
+import { executeWorkflow } from '../system/workflowEngine.js';
+import { performDeepResearch } from '../ai/researcher.js';
 
 /**
  * Execute a single action step.
@@ -229,6 +232,52 @@ const actionMap = {
    */
   pdf_read: async (step) => {
     return await parseDocument(step.filePath || step.text);
+  },
+
+  /**
+   * Compound Multi-Step Workflow Orchestrator.
+   */
+  workflow_execute: async (step) => {
+    return await executeWorkflow(step.workflow || step.key || step.text);
+  },
+
+  /**
+   * System Hardware & Resource Inspector.
+   */
+  system_info: async (step) => {
+    return await getSystemInfo();
+  },
+
+  /**
+   * Battery & Power Status Inspector.
+   */
+  battery_status: async (step) => {
+    return await getBatteryStatus();
+  },
+
+  /**
+   * Deep Multi-Source Web Research Engine.
+   */
+  deep_research: async (step) => {
+    return await performDeepResearch(step.query || step.text || step.topic);
+  },
+
+  /**
+   * Clipboard Read & Write.
+   */
+  clipboard_get: async (step) => {
+    return await getClipboard();
+  },
+
+  clipboard_set: async (step) => {
+    return await setClipboard(step.content || step.text || '');
+  },
+
+  /**
+   * Window Switcher.
+   */
+  window_switch: async (step) => {
+    return await switchWindow(step.appName || step.target || step.text);
   },
 
   /**

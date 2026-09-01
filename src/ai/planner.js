@@ -31,6 +31,7 @@ export async function createPlan(command) {
       prompt: step.prompt || null,
       mediaAction: step.mediaAction || null,
       appName: step.appName || null,
+      workflow: step.workflow || null,
       key: step.key || null,
       content: step.content || null,
       query: step.query || null,
@@ -383,6 +384,115 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
+  // 13. Compound Multi-Step Workflows
+  if (
+    lower.match(/^(?:start\s+|prepare\s+|trigger\s+|run\s+)?(?:coding\s+mode|coding\s+setup|developer\s+mode|dev\s+setup)/i) ||
+    lower.match(/^(?:start\s+|trigger\s+|enable\s+)?(?:focus\s+mode|deep\s+focus|study\s+mode)/i) ||
+    lower.match(/^(?:start\s+|trigger\s+|enable\s+)?(?:relax\s+mode|chill\s+mode|relax)/i) ||
+    lower.match(/^(?:start\s+|prepare\s+)?(?:meeting\s+mode|call\s+mode)/i)
+  ) {
+    let wf = 'coding';
+    if (lower.includes('focus') || lower.includes('study')) wf = 'focus';
+    else if (lower.includes('relax') || lower.includes('chill')) wf = 'relax';
+    else if (lower.includes('meeting') || lower.includes('call')) wf = 'meeting';
+
+    return {
+      summary: `Execute ${wf} workflow`,
+      steps: [{
+        id: 1,
+        action: 'workflow_execute',
+        workflow: wf,
+        description: `Run ${wf} routine`,
+      }],
+    };
+  }
+
+  // 14. System Hardware & Health Queries
+  if (
+    lower === 'battery' || lower === 'battery status' || lower === 'battery percentage' ||
+    lower === 'check battery' || lower === 'how much battery' || lower === 'what is the battery'
+  ) {
+    return {
+      summary: 'Check laptop battery status',
+      steps: [{
+        id: 1,
+        action: 'battery_status',
+        description: 'Query battery charge and power state',
+      }],
+    };
+  }
+
+  if (
+    lower === 'system info' || lower === 'system status' || lower === 'hardware status' ||
+    lower === 'check ram' || lower === 'check memory' || lower === 'check cpu' || lower === 'specs' ||
+    lower === 'system health' || lower === 'check system' || lower === 'pc status'
+  ) {
+    return {
+      summary: 'Query system hardware, memory, CPU, and disk health',
+      steps: [{
+        id: 1,
+        action: 'system_info',
+        description: 'Query hardware utilization metrics',
+      }],
+    };
+  }
+
+  // 15. Deep Multi-Source Web Research
+  const researchMatch = lower.match(/^(?:deep\s+research|research\s+in\s+depth|conduct\s+research\s+on|in-depth\s+research\s+on)\s+(.+)$/i);
+  if (researchMatch) {
+    const topic = researchMatch[1].trim();
+    return {
+      summary: `Conduct deep multi-source research on "${topic}"`,
+      steps: [{
+        id: 1,
+        action: 'deep_research',
+        query: topic,
+        description: `Research ${topic}`,
+      }],
+    };
+  }
+
+  // 16. Clipboard Read & Write
+  const copyClipMatch = rawCmd.match(/^(?:copy\s+to\s+clipboard|set\s+clipboard(?:\s+to)?)\s*[:]?\s*(.+)$/i);
+  if (copyClipMatch) {
+    const textToCopy = copyClipMatch[1].trim();
+    return {
+      summary: `Copy text to clipboard: "${textToCopy}"`,
+      steps: [{
+        id: 1,
+        action: 'clipboard_set',
+        content: textToCopy,
+        description: 'Copy text to clipboard',
+      }],
+    };
+  }
+
+  if (lower === 'clipboard' || lower === 'get clipboard' || lower === 'read clipboard' || lower === 'what is on clipboard' || lower === 'show clipboard') {
+    return {
+      summary: 'Read system clipboard content',
+      steps: [{
+        id: 1,
+        action: 'clipboard_get',
+        description: 'Read clipboard',
+      }],
+    };
+  }
+
+  // 17. Window Switching
+  const switchMatch = lower.match(/^(?:switch\s+to|bring\s+to\s+front|focus\s+window)\s+(.+)$/i);
+  if (switchMatch && !lower.startsWith('open ') && !lower.startsWith('launch ')) {
+    const targetApp = switchMatch[1].trim();
+    return {
+      summary: `Switch to ${targetApp} window`,
+      steps: [{
+        id: 1,
+        action: 'window_switch',
+        appName: targetApp,
+        description: `Bring ${targetApp} to foreground`,
+      }],
+    };
+  }
+
   // 9. Unified Open / Launch System
   const openMatch = lower.match(/^(?:open|launch|start)(?:\s+(?:the|app|my|up))?\s+(.+)$/i);
   if (openMatch) {
@@ -567,6 +677,8 @@ function validateAction(action) {
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
     'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
+    'workflow_execute', 'system_info', 'battery_status', 'deep_research',
+    'clipboard_get', 'clipboard_set', 'window_switch',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',
   ];

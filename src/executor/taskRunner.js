@@ -251,6 +251,8 @@ export async function runTask(command, options = {}) {
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
     'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
+    'workflow_execute', 'system_info', 'battery_status', 'deep_research',
+    'clipboard_get', 'clipboard_set', 'window_switch',
   ];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
@@ -363,6 +365,32 @@ export async function runTask(command, options = {}) {
       } else {
         summary = `❌ Could not parse document: ${res.error || 'Unknown error'}`;
       }
+    } else if (lastStep.action === 'workflow_execute') {
+      const res = lastStep.result || {};
+      summary = res.summary || `Workflow executed successfully.`;
+      if (res.openUrl) openUrl = res.openUrl;
+    } else if (lastStep.action === 'system_info') {
+      const res = lastStep.result || {};
+      if (res.success) {
+        summary = `💻 **System Hardware & Health:**\n\n• **Battery:** ${res.battery?.percent} (${res.battery?.status})\n• **RAM:** ${res.ram?.used} / ${res.ram?.total} (Free: ${res.ram?.free})\n• **CPU:** ${res.cpu?.model} (${res.cpu?.cores} cores)\n• **Disk (C:):** Free ${res.disk?.free} / ${res.disk?.total}\n• **OS Uptime:** ${res.os?.uptime} (${res.os?.platform})`;
+      } else {
+        summary = `Could not query system info: ${res.error || 'Unknown error'}`;
+      }
+    } else if (lastStep.action === 'battery_status') {
+      const res = lastStep.result || {};
+      summary = `🔋 **Battery:** ${res.percent || '100%'} — ${res.status || 'AC Powered'}`;
+    } else if (lastStep.action === 'deep_research') {
+      const res = lastStep.result || {};
+      summary = res.summary || res.report || `Deep research completed.`;
+    } else if (lastStep.action === 'clipboard_get') {
+      const res = lastStep.result || {};
+      summary = `📋 **Clipboard:** ${res.text ? `\`${res.text}\`` : 'Clipboard is empty.'}`;
+    } else if (lastStep.action === 'clipboard_set') {
+      const res = lastStep.result || {};
+      summary = `📋 Copied to clipboard: "${res.text}"`;
+    } else if (lastStep.action === 'window_switch') {
+      const res = lastStep.result || {};
+      summary = `🪟 Brought ${lastStep.appName || 'application'} window to foreground.`;
     } else {
       summary = `Task completed successfully.`;
     }

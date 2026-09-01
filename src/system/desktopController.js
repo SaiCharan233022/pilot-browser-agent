@@ -87,3 +87,37 @@ export async function openAndPlay(appName = 'spotify') {
     message: `Opened ${appName} and started playback of your current song.`,
   };
 }
+
+/**
+ * Get current clipboard text.
+ */
+export async function getClipboard() {
+  try {
+    const { stdout } = await execAsync('powershell.exe -NoProfile -Command "Get-Clipboard"');
+    const text = stdout.trim();
+    return { success: true, text, message: text ? `Clipboard content: "${text}"` : 'Clipboard is empty.' };
+  } catch (err) {
+    return { success: false, error: `Could not read clipboard: ${err.message}` };
+  }
+}
+
+/**
+ * Set system clipboard text.
+ */
+export async function setClipboard(text) {
+  try {
+    const base64 = Buffer.from(text || '', 'utf-8').toString('base64');
+    await execAsync(`powershell.exe -NoProfile -Command "[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${base64}')) | Set-Clipboard"`);
+    return { success: true, text, message: `Copied to clipboard: "${text}"` };
+  } catch (err) {
+    return { success: false, error: `Could not set clipboard: ${err.message}` };
+  }
+}
+
+/**
+ * Switch to or bring specific application window to front.
+ */
+export async function switchWindow(appName) {
+  return await focusWindow(appName);
+}
+

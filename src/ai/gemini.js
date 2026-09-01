@@ -45,6 +45,10 @@ export function isGeminiReady() {
 /**
  * Helper to call Gemini with model fallback and working model caching.
  */
+export async function generateContent(generateArgs, modelOptions = {}) {
+  return await callGeminiWithFallback(modelOptions, generateArgs);
+}
+
 async function callGeminiWithFallback(modelOptions, generateArgs) {
   if (!genAI) throw new Error('Gemini not initialized. Set your API key first.');
 
