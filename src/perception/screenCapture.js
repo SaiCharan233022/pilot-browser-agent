@@ -12,14 +12,24 @@ import * as browser from '../browser/controller.js';
 const execAsync = promisify(exec);
 
 /**
- * Capture full desktop or active window screenshot as Base64.
+ * Capture full desktop state (screenshot + active windows list).
  */
 export async function captureScreen() {
-  // 1. Try native dual-engine desktop capture (GDI BitBlt + CopyFromScreen)
+  let activeWindows = [];
+
+  // 1. Try native desktop capture script
   try {
-    const scriptPath = join(process.cwd(), 'src', 'perception', 'captureDesktop.ps1');
+    const scriptPath = join(process.cwd(), 'src', 'perception', 'getDesktopState.ps1');
     const outputPath = join(process.cwd(), 'data', 'latest_screen.jpg');
-    await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}" -OutputPath "${outputPath}"`, { timeout: 4000 });
+    const { stdout } = await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}" -OutputPath "${outputPath}"`, { timeout: 5000 });
+    
+    try {
+      const parsed = JSON.parse(stdout.trim());
+      if (parsed.activeWindows && Array.isArray(parsed.activeWindows)) {
+        activeWindows = parsed.activeWindows;
+      }
+    } catch {}
+
     const buffer = await fs.readFile(outputPath);
     if (buffer && buffer.length > 500) {
       return {
@@ -27,6 +37,7 @@ export async function captureScreen() {
         source: 'desktop',
         buffer,
         base64: buffer.toString('base64'),
+        activeWindows,
       };
     }
   } catch {}
@@ -41,12 +52,13 @@ export async function captureScreen() {
           source: 'browser',
           buffer,
           base64: buffer.toString('base64'),
+          activeWindows,
         };
       }
     } catch {}
   }
 
-  return { success: false, error: 'Could not capture desktop or browser screen.' };
+  return { success: false, error: 'Could not capture desktop or browser screen.', activeWindows };
 }
 
 /**
@@ -63,14 +75,18 @@ export async function inspectScreen(prompt = 'What is currently displayed on thi
 
   try {
     const { generateContent } = await import('../ai/gemini.js');
+    const windowsContext = (cap.activeWindows && cap.activeWindows.length > 0)
+      ? `\nDetected Active Windows/Apps:\n${cap.activeWindows.map(w => `• ${w}`).join('\n')}\n`
+      : '';
+
     const visionPrompt = `You are Pilot, an advanced AI Operating Layer with multimodal computer vision.
-Analyze this screenshot of the user's laptop screen.
+Analyze this snapshot of the user's laptop screen.
 
 User Question/Prompt: "${prompt}"
-
+${windowsContext}
 Provide a clean, structured visual breakdown in Markdown:
 1. 🖥️ **Active Applications & Windows:** (List all visible apps, browser tabs, or tools)
-2. 👁️ **Main Content & Visual Details:** (Describe what is shown in the center of the screen, text, charts, code, or messages)
+2. 👁️ **Main Content & Visual Details:** (Describe what is shown on screen, text, charts, code, or messages)
 3. 📌 **Current Context / State:** (What task or workflow is in progress)
 
 Keep your response sharp, clear, and direct.`;
