@@ -363,6 +363,8 @@ function renderTaskSummary(msg) {
     </div>
   ` : '';
 
+  const isFocusMode = !!(msg.focusWidget || (msg.summary && (msg.summary.includes('Focus Space Activated') || msg.summary.includes('Focus Mode Active'))));
+
   div.innerHTML = `
     <div class="message-body">
       <div class="message-header">
@@ -374,6 +376,32 @@ function renderTaskSummary(msg) {
         ${editBtnHtml}
       </div>
       <div class="agent-output" id="output-${msg.taskId || 'latest'}"></div>
+      ${isFocusMode ? `
+        <div class="focus-timer-widget">
+          <div class="focus-timer-display">
+            <div class="focus-timer-circle">
+              <span class="focus-time-text" id="timer-display-${msg.taskId || 'focus'}">25:00</span>
+              <span class="focus-mode-label">POMODORO FOCUS</span>
+            </div>
+          </div>
+          <div class="focus-timer-controls">
+            <button class="btn-timer-action btn-timer-start" id="btn-timer-toggle-${msg.taskId || 'focus'}">▶ Start</button>
+            <button class="btn-timer-action btn-timer-reset" id="btn-timer-reset-${msg.taskId || 'focus'}">🔄 Reset</button>
+            <button class="btn-timer-action btn-timer-adjust" id="btn-timer-plus-${msg.taskId || 'focus'}">+5 min</button>
+          </div>
+          <div class="focus-scratchpad-container">
+            <div class="focus-scratchpad-header">
+              <span>📝 <strong>Focus Scratchpad</strong></span>
+              <span class="focus-scratchpad-hint">Type session goals and thoughts</span>
+            </div>
+            <textarea class="focus-scratchpad-textarea" placeholder="• Focus Goal 1: Build AI Personal OS&#10;• Focus Goal 2: Refine voice & workflows..."></textarea>
+            <div class="focus-scratchpad-actions">
+              <button class="btn-save-scratchpad">💾 Save to focus_notes.md</button>
+              <span class="scratchpad-save-status"></span>
+            </div>
+          </div>
+        </div>
+      ` : ''}
       ${hasFile ? `
         <div class="file-editor-container" style="display: none;">
           <div class="file-editor-bar">
@@ -390,6 +418,101 @@ function renderTaskSummary(msg) {
       ` : ''}
     </div>
   `;
+
+  if (isFocusMode) {
+    const timerDisplay = div.querySelector(`#timer-display-${msg.taskId || 'focus'}`);
+    const toggleBtn = div.querySelector(`#btn-timer-toggle-${msg.taskId || 'focus'}`);
+    const resetBtn = div.querySelector(`#btn-timer-reset-${msg.taskId || 'focus'}`);
+    const plusBtn = div.querySelector(`#btn-timer-plus-${msg.taskId || 'focus'}`);
+    const scratchpad = div.querySelector('.focus-scratchpad-textarea');
+    const saveScratchBtn = div.querySelector('.btn-save-scratchpad');
+    const statusScratch = div.querySelector('.scratchpad-save-status');
+
+    let totalSeconds = 25 * 60;
+    let timerInterval = null;
+    let isRunning = false;
+
+    const updateDisplay = () => {
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      if (timerDisplay) {
+        timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+    };
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        if (isRunning) {
+          clearInterval(timerInterval);
+          isRunning = false;
+          toggleBtn.textContent = '▶ Start';
+          toggleBtn.classList.remove('active');
+        } else {
+          isRunning = true;
+          toggleBtn.textContent = '⏸ Pause';
+          toggleBtn.classList.add('active');
+          timerInterval = setInterval(() => {
+            if (totalSeconds > 0) {
+              totalSeconds--;
+              updateDisplay();
+            } else {
+              clearInterval(timerInterval);
+              isRunning = false;
+              toggleBtn.textContent = '🎉 Done!';
+              toggleBtn.classList.remove('active');
+              voice.speak('Focus session completed. Great work!');
+            }
+          }, 1000);
+        }
+      });
+    }
+
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        clearInterval(timerInterval);
+        isRunning = false;
+        totalSeconds = 25 * 60;
+        updateDisplay();
+        if (toggleBtn) {
+          toggleBtn.textContent = '▶ Start';
+          toggleBtn.classList.remove('active');
+        }
+      });
+    }
+
+    if (plusBtn) {
+      plusBtn.addEventListener('click', () => {
+        totalSeconds += 5 * 60;
+        updateDisplay();
+      });
+    }
+
+    if (saveScratchBtn && scratchpad) {
+      saveScratchBtn.addEventListener('click', async () => {
+        const text = scratchpad.value;
+        if (!text.trim()) return;
+        saveScratchBtn.disabled = true;
+        saveScratchBtn.textContent = '⏳ Saving...';
+        try {
+          const res = await fetch('/api/files/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath: 'focus_notes.md', content: text }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            statusScratch.textContent = '✅ Saved to focus_notes.md!';
+            setTimeout(() => { statusScratch.textContent = ''; }, 2500);
+          }
+        } catch (e) {
+          statusScratch.textContent = '❌ Error saving';
+        } finally {
+          saveScratchBtn.disabled = false;
+          saveScratchBtn.textContent = '💾 Save to focus_notes.md';
+        }
+      });
+    }
+  }
 
   if (hasFile) {
     const editBtn = div.querySelector('.btn-edit-file');

@@ -41,39 +41,23 @@ export const PRESET_WORKFLOWS = {
 
   focus: {
     name: 'Deep Focus Mode',
-    description: 'Mute distractions, launch preferred focus editor, and open Pomodoro Focus timer',
+    description: 'Activate In-Chat Focus Timer, Scratchpad, and calm audio',
     execute: async () => {
       const log = [];
       await setVolume(15);
       log.push('🔇 Volume dialed to calm 15%');
-
-      // Check user's preferred editor / notes app from memory
-      let targetEditor = 'notepad';
-      let editorName = 'Notepad';
-      try {
-        const { getKnowledgeFact } = await import('../storage/memory.js');
-        const favEditor = getKnowledgeFact('favorite editor') || getKnowledgeFact('favorite programming language');
-        if (favEditor && (favEditor.toLowerCase().includes('code') || favEditor.toLowerCase().includes('vs'))) {
-          targetEditor = 'code';
-          editorName = 'VS Code';
-        }
-      } catch {}
-
-      await launchApp(targetEditor);
-      log.push(`💻 Launched ${editorName} for focus work`);
-      await sleep(300);
-
-      try {
-        await execAsync('powershell.exe -NoProfile -Command "Start-Process \'https://pomofocus.io\'"');
-        log.push('⏱️ Opened Pomodoro Timer in browser');
-      } catch {}
+      log.push('⏱️ In-Chat 25-min Pomodoro Countdown Timer activated');
+      log.push('📝 Built-in Focus Scratchpad initialized');
 
       return {
         success: true,
         workflow: 'focus',
         steps: log,
-        openUrl: 'https://pomofocus.io',
-        summary: `🎯 **Focus Mode Active:**\n\n• ${log.join('\n• ')}\n• ⏱️ Pomodoro Timer launched: [pomofocus.io](https://pomofocus.io)\n• Distractions minimized. Ready for deep work!`,
+        focusWidget: {
+          durationMinutes: 25,
+          mode: 'pomodoro',
+        },
+        summary: `🎯 **In-Chat Focus Space Activated:**\n\n• ${log.join('\n• ')}\n• Zero popups or external tabs. All focused right here!`,
       };
     },
   },

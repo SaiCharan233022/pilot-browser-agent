@@ -257,6 +257,7 @@ export async function runTask(command, options = {}) {
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
   let fileMeta = null;
+  let focusWidget = null;
 
   if (plan.steps.length === 1 && plan.steps[0].action === 'navigate' && task.completedSteps.length > 0) {
     openUrl = plan.steps[0].url;
@@ -396,6 +397,7 @@ export async function runTask(command, options = {}) {
       const res = lastStep.result || {};
       summary = res.summary || `Workflow executed successfully.`;
       if (res.openUrl) openUrl = res.openUrl;
+      if (res.focusWidget) focusWidget = res.focusWidget;
     } else if (lastStep.action === 'system_info') {
       const res = lastStep.result || {};
       if (res.success) {
@@ -445,6 +447,7 @@ export async function runTask(command, options = {}) {
     summary,
     openUrl,
     fileMeta,
+    focusWidget,
     stepsCompleted: task.completedSteps.length,
     totalSteps: plan.steps.length,
     extractedData: task.extractedData,
