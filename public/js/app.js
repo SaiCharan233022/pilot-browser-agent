@@ -152,10 +152,6 @@ function handleServerMessage(msg) {
         } catch {}
       }
       renderTaskSummary(msg);
-      loadTaskHistory();
-      if (msg.summary) {
-        voice.speak(msg.summary);
-      }
       break;
 
     case 'replan_complete':
@@ -293,6 +289,42 @@ function renderApprovalRequest(msg) {
   scrollToBottom();
 }
 
+function streamMarkdownToElement(targetEl, fullMarkdown, onComplete) {
+  if (!fullMarkdown) {
+    targetEl.innerHTML = '';
+    if (onComplete) onComplete();
+    return;
+  }
+
+  // Tokenize text into words / punctuation chunks
+  const tokens = fullMarkdown.match(/\s+|\S+/g) || [fullMarkdown];
+  let currentIndex = 0;
+  let accumulatedText = '';
+  const delayMs = 18; // ~20ms per token - smooth balanced natural speed
+
+  function renderNext() {
+    const batch = Math.min(tokens.length - currentIndex, 1);
+    for (let i = 0; i < batch; i++) {
+      accumulatedText += tokens[currentIndex++];
+    }
+
+    const currentHtml = markdownToHtml(accumulatedText);
+    targetEl.innerHTML = currentHtml + '<span class="typing-cursor"></span>';
+    scrollToBottom();
+
+    if (currentIndex < tokens.length) {
+      setTimeout(renderNext, delayMs);
+    } else {
+      // Completed - remove cursor and render final markdown
+      targetEl.innerHTML = markdownToHtml(fullMarkdown);
+      scrollToBottom();
+      if (onComplete) onComplete();
+    }
+  }
+
+  renderNext();
+}
+
 function renderTaskSummary(msg) {
   removeStatusMessage();
   const messagesContainer = $('#messages');
@@ -306,8 +338,6 @@ function renderTaskSummary(msg) {
     messagesContainer.appendChild(div);
   }
 
-  const summaryHtml = markdownToHtml(msg.summary || 'Completed.');
-
   div.innerHTML = `
     <div class="message-body">
       <div class="message-header">
@@ -315,9 +345,17 @@ function renderTaskSummary(msg) {
         <span class="message-sender">Pilot</span>
         <span class="message-time">${formatTime()}</span>
       </div>
-      <div class="agent-output">${summaryHtml}</div>
+      <div class="agent-output" id="output-${msg.taskId || 'latest'}"></div>
     </div>
   `;
+
+  const outputEl = div.querySelector('.agent-output');
+  streamMarkdownToElement(outputEl, msg.summary || 'Completed.', () => {
+    loadTaskHistory();
+    if (msg.summary) {
+      voice.speak(msg.summary);
+    }
+  });
 
   scrollToBottom();
 }
