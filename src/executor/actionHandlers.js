@@ -206,8 +206,8 @@ const actionMap = {
   /**
    * Desktop Screen Perception & Vision Inspection.
    */
-  desktop_screen_inspect: async (step) => {
-    return await inspectScreen(step.prompt || step.text || 'What is currently displayed on this screen?');
+  desktop_screen_inspect: async (step, context) => {
+    return await inspectScreen(step.prompt || step.text || 'What is currently displayed on this screen?', step.clientScreenshot || context?.clientScreenshot);
   },
 
   /**

@@ -231,6 +231,7 @@ async function handleClientMessage(message, broadcast) {
       runTask(message.text, {
         headless: message.headless ?? (process.env.HEADLESS === 'true'),
         profilePath: process.env.CHROME_PROFILE_PATH || 'auto',
+        clientScreenshot: message.clientScreenshot || null,
       }).catch(err => {
         broadcast({ type: 'error', message: `Task failed: ${err.message}` });
       });

@@ -64,8 +64,27 @@ export async function captureScreen() {
 /**
  * Inspect what is currently visible on the screen using Gemini Vision.
  */
-export async function inspectScreen(prompt = 'What is currently displayed on this screen? Describe the main applications, windows, error messages, or contents in detail.') {
-  const cap = await captureScreen();
+export async function inspectScreen(prompt = 'What is currently displayed on this screen? Describe the main applications, windows, error messages, or contents in detail.', clientScreenshot = null) {
+  let cap = null;
+
+  if (clientScreenshot && typeof clientScreenshot === 'string' && clientScreenshot.length > 100) {
+    try {
+      const rawBase64 = clientScreenshot.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(rawBase64, 'base64');
+      cap = {
+        success: true,
+        source: 'desktop',
+        buffer,
+        base64: rawBase64,
+        activeWindows: [],
+      };
+    } catch {}
+  }
+
+  if (!cap) {
+    cap = await captureScreen();
+  }
+
   if (!cap.success) {
     return {
       success: false,

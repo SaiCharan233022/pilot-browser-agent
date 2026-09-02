@@ -803,17 +803,50 @@ function setupEventListeners() {
   });
 }
 
-function sendCommand() {
+async function captureClientScreenFrame() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return null;
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    await new Promise(r => {
+      video.onloadedmetadata = r;
+      setTimeout(r, 200);
+    });
+    video.play();
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    stream.getTracks().forEach(t => t.stop());
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } catch (err) {
+    console.warn('DisplayMedia capture cancelled or unavailable:', err);
+    return null;
+  }
+}
+
+async function sendCommand() {
   const commandInput = $('#command-input');
   if (!commandInput) return;
   const text = commandInput.value.trim();
   if (!text) return;
 
   addUserMessage(text);
-  send({ type: 'command', text });
   commandInput.value = '';
   commandInput.style.height = 'auto';
   commandInput.focus();
+
+  const isScreenInspect = text.toLowerCase().match(/^(?:what\s+is\s+on\s+my\s+screen|inspect\s+(?:my\s+)?screen|look\s+at\s+my\s+screen|what\s+is\s+on\s+desktop|summarize\s+(?:my\s+)?screen|take\s+a\s+screenshot)/i);
+
+  let clientScreenshot = null;
+  if (isScreenInspect) {
+    renderStatusMessage('📸 Capturing screen display...', 'running');
+    clientScreenshot = await captureClientScreenFrame();
+  }
+
+  send({ type: 'command', text, clientScreenshot });
 }
 
 // === Memory Inspector Data ===

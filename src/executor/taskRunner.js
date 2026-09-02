@@ -137,6 +137,7 @@ export async function runTask(command, options = {}) {
     const actionResult = await executeAction(step, {
       taskId: plan.taskId,
       task: command,
+      clientScreenshot: options.clientScreenshot || null,
     });
 
     if (actionResult.success) {
