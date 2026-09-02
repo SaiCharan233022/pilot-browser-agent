@@ -1,6 +1,6 @@
 /**
  * Pilot Desktop Perception & Visual Screenshot Engine
- * Captures full desktop display or active window for Gemini Vision inspection.
+ * Captures full desktop display or active window for Gemini Multimodal Vision inspection.
  */
 
 import { exec } from 'child_process';
@@ -8,7 +8,6 @@ import { promisify } from 'util';
 import { join } from 'path';
 import { promises as fs } from 'fs';
 import * as browser from '../browser/controller.js';
-import { analyzeScreenshot } from '../ai/gemini.js';
 
 const execAsync = promisify(exec);
 
@@ -16,13 +15,13 @@ const execAsync = promisify(exec);
  * Capture full desktop or active window screenshot as Base64.
  */
 export async function captureScreen() {
-  // 1. Try native PowerShell desktop capture
+  // 1. Try native dual-engine desktop capture (GDI BitBlt + CopyFromScreen)
   try {
     const scriptPath = join(process.cwd(), 'src', 'perception', 'captureDesktop.ps1');
     const outputPath = join(process.cwd(), 'data', 'latest_screen.jpg');
     await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${scriptPath}" -OutputPath "${outputPath}"`, { timeout: 4000 });
     const buffer = await fs.readFile(outputPath);
-    if (buffer && buffer.length > 1000) {
+    if (buffer && buffer.length > 500) {
       return {
         success: true,
         source: 'desktop',
@@ -36,7 +35,7 @@ export async function captureScreen() {
   if (browser.isRunning()) {
     try {
       const buffer = await browser.screenshot();
-      if (buffer && buffer.length > 1000) {
+      if (buffer && buffer.length > 500) {
         return {
           success: true,
           source: 'browser',
@@ -63,12 +62,28 @@ export async function inspectScreen(prompt = 'What is currently displayed on thi
   }
 
   try {
-    const analysis = await analyzeScreenshot(cap.buffer, {
-      task: prompt,
-      url: cap.source === 'desktop' ? 'Windows Desktop' : 'Active Browser Window',
-      title: 'Full Screen Perception',
-      stepDescription: prompt,
-    });
+    const { generateContent } = await import('../ai/gemini.js');
+    const visionPrompt = `You are Pilot, an advanced AI Operating Layer with multimodal computer vision.
+Analyze this screenshot of the user's laptop screen.
+
+User Question/Prompt: "${prompt}"
+
+Provide a clean, structured visual breakdown in Markdown:
+1. 🖥️ **Active Applications & Windows:** (List all visible apps, browser tabs, or tools)
+2. 👁️ **Main Content & Visual Details:** (Describe what is shown in the center of the screen, text, charts, code, or messages)
+3. 📌 **Current Context / State:** (What task or workflow is in progress)
+
+Keep your response sharp, clear, and direct.`;
+
+    const mimeType = (cap.buffer && cap.buffer[0] === 0xFF && cap.buffer[1] === 0xD8) ? 'image/jpeg' : 'image/png';
+    const imagePart = {
+      inlineData: {
+        data: cap.buffer.toString('base64'),
+        mimeType,
+      },
+    };
+
+    const analysis = await generateContent([visionPrompt, imagePart]);
 
     return {
       success: true,
