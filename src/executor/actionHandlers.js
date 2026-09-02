@@ -16,7 +16,7 @@ import { extractPdfText } from '../system/pdfExtractor.js';
 import { parseDocument } from '../system/documentParser.js';
 import { getSystemInfo, getBatteryStatus } from '../system/systemInspector.js';
 import { executeWorkflow } from '../system/workflowEngine.js';
-import { performDeepResearch } from '../ai/researcher.js';
+import { performDeepResearch, researchAndSave } from '../ai/researcher.js';
 
 /**
  * Execute a single action step.
@@ -260,6 +260,13 @@ const actionMap = {
    */
   deep_research: async (step) => {
     return await performDeepResearch(step.query || step.text || step.topic);
+  },
+
+  /**
+   * Autonomous Topic Research & Auto-Save to File.
+   */
+  research_and_save: async (step) => {
+    return await researchAndSave(step.topic || step.text, step.filePath);
   },
 
   /**

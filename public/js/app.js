@@ -338,16 +338,120 @@ function renderTaskSummary(msg) {
     messagesContainer.appendChild(div);
   }
 
+  const hasFile = !!(msg.fileMeta && msg.fileMeta.filePath);
+  const editBtnHtml = hasFile ? `
+    <button class="btn-edit-file" data-file="${escapeHtml(msg.fileMeta.filePath)}" title="Edit file content directly">
+      ✏️ Edit File
+    </button>
+  ` : '';
+
   div.innerHTML = `
     <div class="message-body">
       <div class="message-header">
-        <div class="message-avatar">🧭</div>
-        <span class="message-sender">Pilot</span>
-        <span class="message-time">${formatTime()}</span>
+        <div class="message-sender-group">
+          <div class="message-avatar">🧭</div>
+          <span class="message-sender">Pilot</span>
+          <span class="message-time">${formatTime()}</span>
+        </div>
+        ${editBtnHtml}
       </div>
       <div class="agent-output" id="output-${msg.taskId || 'latest'}"></div>
+      ${hasFile ? `
+        <div class="file-editor-container" style="display: none;">
+          <div class="file-editor-bar">
+            <span class="file-editor-name">📄 <strong>${escapeHtml(msg.fileMeta.name || 'file')}</strong></span>
+            <span class="file-editor-hint">Edit and save directly to disk</span>
+          </div>
+          <textarea class="file-editor-textarea" rows="12">${escapeHtml(msg.fileMeta.content || '')}</textarea>
+          <div class="file-editor-actions">
+            <button class="btn-save-file">💾 Save Changes (Ctrl+S)</button>
+            <button class="btn-cancel-file">Cancel</button>
+            <span class="file-save-status"></span>
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
+
+  if (hasFile) {
+    const editBtn = div.querySelector('.btn-edit-file');
+    const editorContainer = div.querySelector('.file-editor-container');
+    const outputEl = div.querySelector('.agent-output');
+    const textarea = div.querySelector('.file-editor-textarea');
+    const saveBtn = div.querySelector('.btn-save-file');
+    const cancelBtn = div.querySelector('.btn-cancel-file');
+    const statusEl = div.querySelector('.file-save-status');
+
+    if (editBtn && editorContainer) {
+      editBtn.addEventListener('click', () => {
+        const isEditing = editorContainer.style.display !== 'none';
+        if (isEditing) {
+          editorContainer.style.display = 'none';
+          outputEl.style.display = 'block';
+          editBtn.innerHTML = '✏️ Edit File';
+        } else {
+          editorContainer.style.display = 'block';
+          outputEl.style.display = 'none';
+          editBtn.innerHTML = '👁️ Preview';
+          textarea.focus();
+        }
+      });
+    }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        editorContainer.style.display = 'none';
+        outputEl.style.display = 'block';
+        if (editBtn) editBtn.innerHTML = '✏️ Edit File';
+      });
+    }
+
+    if (saveBtn) {
+      const handleSave = async () => {
+        const newContent = textarea.value;
+        saveBtn.disabled = true;
+        saveBtn.textContent = '⏳ Saving...';
+        statusEl.textContent = '';
+
+        try {
+          const res = await fetch('/api/files/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath: msg.fileMeta.filePath, content: newContent }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            statusEl.innerHTML = `✅ Saved to <strong>${escapeHtml(msg.fileMeta.name)}</strong> (${data.size || 'updated'})!`;
+            statusEl.className = 'file-save-status success';
+            msg.fileMeta.content = newContent;
+            outputEl.innerHTML = markdownToHtml(`📝 **Saved:** \`${msg.fileMeta.name}\`\n\n${newContent}`);
+            setTimeout(() => {
+              editorContainer.style.display = 'none';
+              outputEl.style.display = 'block';
+              if (editBtn) editBtn.innerHTML = '✏️ Edit File';
+            }, 1200);
+          } else {
+            statusEl.textContent = `❌ Error: ${data.error || 'Save failed'}`;
+            statusEl.className = 'file-save-status error';
+          }
+        } catch (err) {
+          statusEl.textContent = `❌ Error: ${err.message}`;
+          statusEl.className = 'file-save-status error';
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 Save Changes (Ctrl+S)';
+        }
+      };
+
+      saveBtn.addEventListener('click', handleSave);
+      textarea.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault();
+          handleSave();
+        }
+      });
+    }
+  }
 
   const outputEl = div.querySelector('.agent-output');
   streamMarkdownToElement(outputEl, msg.summary || 'Completed.', () => {

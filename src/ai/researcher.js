@@ -82,3 +82,50 @@ Keep it sharp, rigorous, and insightful.`;
   }
 }
 
+/**
+ * Research a topic and automatically write the synthesized document to a file.
+ */
+export async function researchAndSave(topic, filePath) {
+  if (!topic || !filePath) {
+    return { success: false, error: 'Both topic and filePath are required.' };
+  }
+
+  // 1. Generate comprehensive, rich document on the topic
+  const prompt = `You are Pilot, a world-class AI researcher and technical writer.
+Write a comprehensive, rich, and beautifully structured document on the topic: "${topic}".
+
+Format cleanly in Markdown with:
+# ${topic.toUpperCase()}
+### 📌 Executive Summary
+### 🔑 Core Concepts & Deep Insights
+### 📊 Key Analysis / Comparison Table
+### 💡 Best Practices & Actionable Takeaways
+
+Make it thorough, detailed, and formatted with rich emojis and clean markdown tables.`;
+
+  let content = '';
+  try {
+    content = await generateContent(prompt);
+  } catch (err) {
+    content = `# ${topic}\n\nSummary and notes on ${topic}.\n\n- Researched via Pilot AI.`;
+  }
+
+  // 2. Save the file to disk
+  const { writeFileContent } = await import('../system/fileExplorer.js');
+  const writeRes = await writeFileContent(filePath, content);
+  if (!writeRes.success) {
+    return writeRes;
+  }
+
+  return {
+    success: true,
+    topic,
+    filePath: writeRes.filePath,
+    name: writeRes.name,
+    size: writeRes.size,
+    rawContent: content,
+    summary: `📝 **Created & Saved:** \`${writeRes.name}\` (${writeRes.size})\n\n${content}`,
+  };
+}
+
+

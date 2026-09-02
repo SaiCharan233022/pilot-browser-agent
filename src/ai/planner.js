@@ -32,6 +32,7 @@ export async function createPlan(command) {
       mediaAction: step.mediaAction || null,
       appName: step.appName || null,
       workflow: step.workflow || null,
+      topic: step.topic || null,
       key: step.key || null,
       content: step.content || null,
       query: step.query || null,
@@ -319,6 +320,23 @@ function getFastPathPlan(rawCmd) {
         filePath,
         content,
         description: `Write content to ${filePath}`,
+      }],
+    };
+  }
+
+  // 8b. Autonomous Topic Research & Auto-Save
+  const researchSaveMatch = rawCmd.match(/^(?:research|write(?:\s+about|\s+on|\s+a\s+report\s+on|\s+notes\s+on|\s+an\s+essay\s+on)?|create(?:\s+a)?\s+file\s+on)\s+([a-zA-Z0-9_\s-]+?)\s+(?:and\s+save(?:\s+it)?\s+to|called|as|into)\s+([a-z0-9_./\\-]+\.[a-z0-9]+)/i);
+  if (researchSaveMatch) {
+    const topic = researchSaveMatch[1].trim();
+    const filePath = researchSaveMatch[2].trim();
+    return {
+      summary: `Research "${topic}" and save to ${filePath}`,
+      steps: [{
+        id: 1,
+        action: 'research_and_save',
+        topic,
+        filePath,
+        description: `Research ${topic} and save to ${filePath}`,
       }],
     };
   }
@@ -677,7 +695,7 @@ function validateAction(action) {
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
     'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
-    'workflow_execute', 'system_info', 'battery_status', 'deep_research',
+    'workflow_execute', 'system_info', 'battery_status', 'deep_research', 'research_and_save',
     'clipboard_get', 'clipboard_set', 'window_switch',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',

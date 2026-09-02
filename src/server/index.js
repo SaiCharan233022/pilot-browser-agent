@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { getAllTasks, getTask, getTaskSteps } from '../storage/history.js';
 import { runTask, approveAction, rejectAction, cancelTask, setBroadcast } from '../executor/taskRunner.js';
 import { initGemini, isGeminiReady } from '../ai/gemini.js';
+import { writeFileContent } from '../system/fileExplorer.js';
 import * as browser from '../browser/controller.js';
 
 const app = express();
@@ -47,6 +48,16 @@ app.get('/api/tasks/:id', (req, res) => {
 app.get('/api/tasks/:id/steps', (req, res) => {
   const steps = getTaskSteps(req.params.id);
   res.json({ steps });
+});
+
+/**
+ * POST /api/files/save — Save manual edits to a file.
+ */
+app.post('/api/files/save', async (req, res) => {
+  const { filePath, content } = req.body;
+  if (!filePath) return res.status(400).json({ error: 'filePath is required' });
+  const result = await writeFileContent(filePath, content || '');
+  res.json(result);
 });
 
 /**

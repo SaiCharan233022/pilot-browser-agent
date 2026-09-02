@@ -251,10 +251,12 @@ export async function runTask(command, options = {}) {
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
     'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
-    'workflow_execute', 'system_info', 'battery_status', 'deep_research',
+    'workflow_execute', 'system_info', 'battery_status', 'deep_research', 'research_and_save',
     'clipboard_get', 'clipboard_set', 'window_switch',
   ];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
+
+  let fileMeta = null;
 
   if (plan.steps.length === 1 && plan.steps[0].action === 'navigate' && task.completedSteps.length > 0) {
     openUrl = plan.steps[0].url;
@@ -326,6 +328,11 @@ export async function runTask(command, options = {}) {
       const res = lastStep.result || {};
       if (res.success) {
         summary = `📄 ${res.name} (${res.displayedLines}/${res.totalLines} lines):\n\n\`\`\`\n${res.content}\n\`\`\``;
+        fileMeta = {
+          filePath: res.filePath || lastStep.filePath,
+          name: res.name,
+          content: res.content,
+        };
       } else {
         summary = `Could not read file: ${res.error || 'Unknown error'}`;
       }
@@ -355,8 +362,25 @@ export async function runTask(command, options = {}) {
       const res = lastStep.result || {};
       if (res.success) {
         summary = `📝 **File Saved:** \`${res.name}\` (${res.size}) — ${res.message || 'File written successfully.'}`;
+        fileMeta = {
+          filePath: res.filePath || lastStep.filePath,
+          name: res.name,
+          content: lastStep.content || '',
+        };
       } else {
         summary = `❌ Could not write file: ${res.error || 'Unknown error'}`;
+      }
+    } else if (lastStep.action === 'research_and_save') {
+      const res = lastStep.result || {};
+      if (res.success) {
+        summary = res.summary || `📝 **Created & Saved:** \`${res.name}\` (${res.size})`;
+        fileMeta = {
+          filePath: res.filePath || lastStep.filePath,
+          name: res.name,
+          content: res.rawContent || '',
+        };
+      } else {
+        summary = `❌ Could not research and save file: ${res.error || 'Unknown error'}`;
       }
     } else if (lastStep.action === 'document_read' || lastStep.action === 'pdf_read') {
       const res = lastStep.result || {};
@@ -417,6 +441,7 @@ export async function runTask(command, options = {}) {
     taskId: plan.taskId,
     summary,
     openUrl,
+    fileMeta,
     stepsCompleted: task.completedSteps.length,
     totalSteps: plan.steps.length,
     extractedData: task.extractedData,
