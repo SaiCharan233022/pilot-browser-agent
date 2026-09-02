@@ -181,7 +181,7 @@ function getFastPathPlan(rawCmd) {
   }
 
   // 3. Knowledge Memory: Remember
-  const remMatch = lower.match(/^remember(?:\s+that)?\s+(?:my\s+)?([^:]+?)(?:\s+is|\s+as|\s*:\s*)\s*(.+)$/i);
+  const remMatch = lower.match(/^remember(?:\s+that)?\s+(?:my\s+)?([^:]+?)(?:\s+is|\s+are|\s+as|\s*:\s*)\s*(.+)$/i);
   if (remMatch) {
     const key = remMatch[1].trim();
     const content = remMatch[2].trim();
@@ -196,17 +196,18 @@ function getFastPathPlan(rawCmd) {
       }],
     };
   }
-  const noteMatch = lower.match(/^(?:save\s+note|remember|take\s+a\s+note)\s*:\s*(.+)$/i);
-  if (noteMatch) {
-    const noteText = noteMatch[1].trim();
+  const generalRememberMatch = rawCmd.match(/^remember(?:\s+that|\s+to)?\s+(.+)$/i);
+  if (generalRememberMatch) {
+    const statement = generalRememberMatch[1].trim();
+    const key = statement.length > 30 ? statement.slice(0, 30).trim() : statement;
     return {
-      summary: `Save note: "${noteText}"`,
+      summary: `Remember: "${statement}"`,
       steps: [{
         id: 1,
         action: 'remember_fact',
-        key: 'note_' + Date.now().toString().slice(-4),
-        content: noteText,
-        description: `Save user note`,
+        key,
+        content: statement,
+        description: `Save user memory`,
       }],
     };
   }
