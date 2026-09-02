@@ -338,6 +338,19 @@ function renderTaskSummary(msg) {
     messagesContainer.appendChild(div);
   }
 
+  if (!msg.fileMeta && msg.summary) {
+    const fileMatch = msg.summary.match(/`([a-zA-Z0-9_.-]+\.(?:md|txt|json|csv|py|js|html|css|log|env))`/) ||
+                      msg.summary.match(/([a-zA-Z0-9_.-]+\.(?:md|txt|json|csv|py|js|html|css|log|env))/);
+    if (fileMatch) {
+      const fileName = fileMatch[1];
+      msg.fileMeta = {
+        filePath: fileName,
+        name: fileName,
+        content: msg.summary.replace(/^📝[\s\S]*?`\s*—\s*.*?\n\n/i, '').replace(/^📄[\s\S]*?\n\n```(?:\w+)?\n([\s\S]*?)\n```$/i, '$1').trim(),
+      };
+    }
+  }
+
   const hasFile = !!(msg.fileMeta && msg.fileMeta.filePath);
   const editBtnHtml = hasFile ? `
     <button class="btn-edit-file" data-file="${escapeHtml(msg.fileMeta.filePath)}" title="Edit file content directly">
