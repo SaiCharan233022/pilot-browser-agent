@@ -270,6 +270,33 @@ const actionMap = {
   },
 
   /**
+   * Conversational Refinement & Follow-up Multi-Turn Engine.
+   */
+  refine_content: async (step) => {
+    const { getLastAgentOutput } = await import('../storage/memory.js');
+    const { generateContent } = await import('../ai/gemini.js');
+    const prevOutput = getLastAgentOutput() || 'Previous context not available.';
+    const instruction = step.instruction || step.text || step.query || 'Refine this content.';
+
+    const prompt = `You are Pilot, an AI personal assistant.
+The user wants to refine/update the previous response according to this instruction:
+"${instruction}"
+
+PREVIOUS CONTENT:
+${prevOutput}
+
+Generate the updated, refined output directly. Apply the requested changes (e.g. shortening, expanding, translating, adding tables/bullet points). Ensure clean Markdown format.`;
+
+    const refined = await generateContent(prompt);
+    return {
+      success: true,
+      instruction,
+      refined,
+      summary: `✨ **Refined Output:**\n\n${refined}`,
+    };
+  },
+
+  /**
    * Clipboard Read & Write.
    */
   clipboard_get: async (step) => {

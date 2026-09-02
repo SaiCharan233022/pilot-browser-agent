@@ -251,7 +251,7 @@ export async function runTask(command, options = {}) {
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
     'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
-    'workflow_execute', 'system_info', 'battery_status', 'deep_research', 'research_and_save',
+    'workflow_execute', 'system_info', 'battery_status', 'deep_research', 'research_and_save', 'refine_content',
     'clipboard_get', 'clipboard_set', 'window_switch',
   ];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
@@ -382,6 +382,9 @@ export async function runTask(command, options = {}) {
       } else {
         summary = `❌ Could not research and save file: ${res.error || 'Unknown error'}`;
       }
+    } else if (lastStep.action === 'refine_content') {
+      const res = lastStep.result || {};
+      summary = res.summary || `✨ **Refined Output:**\n\n${res.refined || 'Updated content.'}`;
     } else if (lastStep.action === 'document_read' || lastStep.action === 'pdf_read') {
       const res = lastStep.result || {};
       if (res.success) {

@@ -144,6 +144,25 @@ export function getRecentTurns(limit = 10) {
 }
 
 /**
+ * Get the most recent assistant output from conversation turns.
+ */
+export function getLastAgentOutput() {
+  if (!memoryDb) initMemory();
+  try {
+    const row = memoryDb.prepare(`
+      SELECT text, metadata
+      FROM conversation_turns
+      WHERE role = 'assistant'
+      ORDER BY id DESC
+      LIMIT 1
+    `).get();
+    return row ? row.text : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
  * Get all user inputs from conversation history.
  */
 export function getUserInputs(limit = 25) {

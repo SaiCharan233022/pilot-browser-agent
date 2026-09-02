@@ -33,6 +33,7 @@ export async function createPlan(command) {
       appName: step.appName || null,
       workflow: step.workflow || null,
       topic: step.topic || null,
+      instruction: step.instruction || null,
       key: step.key || null,
       content: step.content || null,
       query: step.query || null,
@@ -496,6 +497,20 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
+  // 16b. Multi-Turn Follow-Up & Refinement
+  const refineMatch = rawCmd.match(/^(?:make\s+it\s+(?:shorter|longer|simpler|more\s+detailed|concise|brief|\d+\s*words?)|shorten\s+it|expand\s+(?:on\s+)?(?:it|section\s*\d+|point\s*\d+|this)|add\s+(?:pros\s+and\s+cons|a\s+table|bullet\s+points|examples)|translate(?:\s+it)?\s+to\s+([a-zA-Z\s]+)|rewrite\s+(?:it|this)(?:\s+as|\s+in)?\s*(.+)?)$/i);
+  if (refineMatch) {
+    return {
+      summary: `Refine output: "${rawCmd}"`,
+      steps: [{
+        id: 1,
+        action: 'refine_content',
+        instruction: rawCmd,
+        description: `Refine previous response: ${rawCmd}`,
+      }],
+    };
+  }
+
   // 17. Window Switching
   const switchMatch = lower.match(/^(?:switch\s+to|bring\s+to\s+front|focus\s+window)\s+(.+)$/i);
   if (switchMatch && !lower.startsWith('open ') && !lower.startsWith('launch ')) {
@@ -695,7 +710,7 @@ function validateAction(action) {
     'remember_fact', 'recall_knowledge', 'forget_fact', 'history_query',
     'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
-    'workflow_execute', 'system_info', 'battery_status', 'deep_research', 'research_and_save',
+    'workflow_execute', 'system_info', 'battery_status', 'deep_research', 'research_and_save', 'refine_content',
     'clipboard_get', 'clipboard_set', 'window_switch',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',

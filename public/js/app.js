@@ -353,9 +353,14 @@ function renderTaskSummary(msg) {
 
   const hasFile = !!(msg.fileMeta && msg.fileMeta.filePath);
   const editBtnHtml = hasFile ? `
-    <button class="btn-edit-file" data-file="${escapeHtml(msg.fileMeta.filePath)}" title="Edit file content directly">
-      ✏️ Edit File
-    </button>
+    <div class="message-actions-group">
+      <button class="btn-download-file" data-file="${escapeHtml(msg.fileMeta.filePath)}" title="Download file to computer">
+        📥 Download
+      </button>
+      <button class="btn-edit-file" data-file="${escapeHtml(msg.fileMeta.filePath)}" title="Edit file content directly">
+        ✏️ Edit File
+      </button>
+    </div>
   ` : '';
 
   div.innerHTML = `
@@ -388,12 +393,28 @@ function renderTaskSummary(msg) {
 
   if (hasFile) {
     const editBtn = div.querySelector('.btn-edit-file');
+    const downloadBtn = div.querySelector('.btn-download-file');
     const editorContainer = div.querySelector('.file-editor-container');
     const outputEl = div.querySelector('.agent-output');
     const textarea = div.querySelector('.file-editor-textarea');
     const saveBtn = div.querySelector('.btn-save-file');
     const cancelBtn = div.querySelector('.btn-cancel-file');
     const statusEl = div.querySelector('.file-save-status');
+
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', () => {
+        const content = msg.fileMeta.content || '';
+        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = msg.fileMeta.name || 'document.md';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
 
     if (editBtn && editorContainer) {
       editBtn.addEventListener('click', () => {
@@ -606,6 +627,17 @@ function setupEventListeners() {
     btn.addEventListener('click', () => {
       if (commandInput) commandInput.value = btn.dataset.command;
       sendCommand();
+    });
+  });
+
+  // Quick action chip buttons
+  $$('.chip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cmd = btn.getAttribute('data-cmd');
+      if (commandInput && cmd) {
+        commandInput.value = cmd;
+        sendCommand();
+      }
     });
   });
 
