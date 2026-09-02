@@ -40,18 +40,23 @@ const APP_REGISTRY = {
     processPatterns: ['notepad', 'Notepad'],
     execNames: ['notepad.exe'],
   },
+  'code': {
+    launchCmd: 'powershell.exe -NoProfile -Command "if (Test-Path \'$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\Code.exe\') { Start-Process \'$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\Code.exe\' } elseif (Test-Path \'$env:ProgramFiles\\Microsoft VS Code\\Code.exe\') { Start-Process \'$env:ProgramFiles\\Microsoft VS Code\\Code.exe\' } else { Start-Process code.cmd }"',
+    processPatterns: ['Code'],
+    execNames: ['Code.exe'],
+  },
   'vs code': {
-    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process code"',
+    launchCmd: 'powershell.exe -NoProfile -Command "if (Test-Path \'$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\Code.exe\') { Start-Process \'$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\Code.exe\' } elseif (Test-Path \'$env:ProgramFiles\\Microsoft VS Code\\Code.exe\') { Start-Process \'$env:ProgramFiles\\Microsoft VS Code\\Code.exe\' } else { Start-Process code.cmd }"',
     processPatterns: ['Code'],
     execNames: ['Code.exe'],
   },
   'vscode': {
-    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process code"',
+    launchCmd: 'powershell.exe -NoProfile -Command "if (Test-Path \'$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\Code.exe\') { Start-Process \'$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\Code.exe\' } elseif (Test-Path \'$env:ProgramFiles\\Microsoft VS Code\\Code.exe\') { Start-Process \'$env:ProgramFiles\\Microsoft VS Code\\Code.exe\' } else { Start-Process code.cmd }"',
     processPatterns: ['Code'],
     execNames: ['Code.exe'],
   },
   'visual studio code': {
-    launchCmd: 'powershell.exe -NoProfile -Command "Start-Process code"',
+    launchCmd: 'powershell.exe -NoProfile -Command "if (Test-Path \'$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\Code.exe\') { Start-Process \'$env:LOCALAPPDATA\\Programs\\Microsoft VS Code\\Code.exe\' } elseif (Test-Path \'$env:ProgramFiles\\Microsoft VS Code\\Code.exe\') { Start-Process \'$env:ProgramFiles\\Microsoft VS Code\\Code.exe\' } else { Start-Process code.cmd }"',
     processPatterns: ['Code'],
     execNames: ['Code.exe'],
   },

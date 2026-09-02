@@ -1,13 +1,11 @@
-/**
- * Pilot Compound Workflow & Routine Orchestrator
- * Executes multi-application workflows, system macros, and focus modes with verification.
- */
-
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { launchApp, closeApp } from './appLauncher.js';
 import { setVolume, mute, togglePlayPause } from './mediaController.js';
 import { executeTerminalCommand } from './terminalRunner.js';
 import * as browser from '../browser/controller.js';
 
+const execAsync = promisify(exec);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export const PRESET_WORKFLOWS = {
@@ -26,6 +24,10 @@ export const PRESET_WORKFLOWS = {
       await launchApp('spotify');
       log.push('🎵 Launched Spotify');
       await sleep(300);
+
+      try {
+        await execAsync('powershell.exe -NoProfile -Command "Start-Process \'https://github.com\'"');
+      } catch {}
 
       return {
         success: true,
@@ -92,6 +94,10 @@ export const PRESET_WORKFLOWS = {
 
       await launchApp('notepad');
       log.push('📝 Opened Notepad for meeting minutes');
+
+      try {
+        await execAsync('powershell.exe -NoProfile -Command "Start-Process \'https://calendar.google.com\'"');
+      } catch {}
 
       return {
         success: true,
