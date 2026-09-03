@@ -253,7 +253,7 @@ export async function runTask(command, options = {}) {
     'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
     'workflow_execute', 'system_info', 'battery_status', 'deep_research', 'research_and_save', 'refine_content',
-    'clipboard_get', 'clipboard_set', 'window_switch',
+    'clipboard_get', 'clipboard_set', 'window_switch', 'weather_query',
   ];
   const isAllSystemActions = plan.steps.every(s => systemActionSet.includes(s.action));
 
@@ -384,6 +384,9 @@ export async function runTask(command, options = {}) {
       } else {
         summary = `❌ Could not research and save file: ${res.error || 'Unknown error'}`;
       }
+    } else if (lastStep.action === 'weather_query') {
+      const res = lastStep.result || {};
+      summary = res.summary || `🌤️ **Weather:** Details retrieved for ${lastStep.topic || 'location'}.`;
     } else if (lastStep.action === 'refine_content') {
       const res = lastStep.result || {};
       summary = res.summary || `✨ **Refined Output:**\n\n${res.refined || 'Updated content.'}`;

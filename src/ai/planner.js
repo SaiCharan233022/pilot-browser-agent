@@ -343,6 +343,44 @@ function getFastPathPlan(rawCmd) {
     };
   }
 
+  // 8c. Real-Time Global Weather Query
+  if (lower.includes('weather') && !lower.startsWith('open ') && !lower.startsWith('launch ')) {
+    let cleanCity = lower
+      .replace(/^search\s+/i, '')
+      .replace(/today(?:'s)?\s+/i, '')
+      .replace(/^what(?:\s+is|\s+'s)?(?:\s+the)?\s+/i, '')
+      .replace(/^how(?:\s+is|\s+'s)?(?:\s+the)?\s+/i, '')
+      .replace(/^tell\s+me\s+(?:the\s+)?/i, '')
+      .replace(/weather\s*(?:in|for|at)?\s*/i, '')
+      .replace(/[?.!]/g, '')
+      .trim();
+    if (!cleanCity) cleanCity = 'Tokyo';
+    return {
+      summary: `Check weather for ${cleanCity}`,
+      steps: [{
+        id: 1,
+        action: 'weather_query',
+        topic: cleanCity,
+        description: `Fetch real-time weather in ${cleanCity}`,
+      }],
+    };
+  }
+
+  // 8d. Universal Search & Research Intent (Avoids bot-blocked headless Google)
+  const generalSearchMatch = lower.match(/^(?:search(?:\s+for|\s+web\s+for|\s+online\s+for)?|look\s+up|tell\s+me\s+about|who\s+is|what\s+is(?!\s+on\s+my\s+screen|\s+my\s+favorite|\s+the\s+volume|\s+my\s+battery))\s+(.+)$/i);
+  if (generalSearchMatch && !lower.startsWith('search files') && !lower.startsWith('find files') && !lower.includes('in project')) {
+    const query = generalSearchMatch[1].trim();
+    return {
+      summary: `Research: "${query}"`,
+      steps: [{
+        id: 1,
+        action: 'deep_research',
+        topic: query,
+        description: `Autonomous search & extraction for "${query}"`,
+      }],
+    };
+  }
+
   // 9. Filesystem: List Directory
   const listMatch = lower.match(/(?:list|show)\s+(?:all\s+)?files(?:\s+in\s+(?:the\s+)?([a-z0-9_./\\-]+))?/i);
   if (listMatch) {
@@ -712,7 +750,7 @@ function validateAction(action) {
     'file_search', 'file_read', 'file_write', 'file_list', 'pdf_read', 'document_read',
     'desktop_screen_inspect', 'terminal_command',
     'workflow_execute', 'system_info', 'battery_status', 'deep_research', 'research_and_save', 'refine_content',
-    'clipboard_get', 'clipboard_set', 'window_switch',
+    'clipboard_get', 'clipboard_set', 'window_switch', 'weather_query',
     'navigate', 'click', 'type', 'screenshot_and_extract',
     'scroll', 'wait', 'select', 'extract_text', 'go_back',
   ];

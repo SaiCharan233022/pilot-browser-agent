@@ -52,30 +52,39 @@ export async function generateContent(generateArgs, modelOptions = {}) {
 async function callGeminiWithFallback(modelOptions, generateArgs) {
   if (!genAI) throw new Error('Gemini not initialized. Set your API key first.');
 
-  // If we already know which model works for this API key, try it first
   const candidates = workingModelName
     ? [workingModelName, ...MODEL_CANDIDATES.filter(m => m !== workingModelName)]
     : MODEL_CANDIDATES;
 
   let lastError = null;
   for (const modelName of candidates) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-          maxOutputTokens: 600,
-          temperature: 0.1,
-          ...(modelOptions.generationConfig || {}),
-        },
-        ...modelOptions,
-      });
-      const result = await model.generateContent(generateArgs);
-      workingModelName = modelName; // Cache successful model
-      return result.response.text();
-    } catch (err) {
-      lastError = err;
-      workingModelName = null; // Clear cache on error
-      console.warn(`⚠️ Model ${modelName} error (${err.message}), trying next model...`);
+    // Retry up to 2 times for transient network/socket drops
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            maxOutputTokens: 800,
+            temperature: 0.1,
+            ...(modelOptions.generationConfig || {}),
+          },
+          ...modelOptions,
+        });
+        const result = await model.generateContent(generateArgs);
+        workingModelName = modelName; // Cache successful model
+        return result.response.text();
+      } catch (err) {
+        lastError = err;
+        const msg = err.message || '';
+        const isNetworkErr = msg.includes('fetch failed') || msg.includes('ECONNRESET') || msg.includes('ETIMEDOUT') || msg.includes('EOF') || msg.includes('429');
+        if (isNetworkErr && attempt < 2) {
+          await new Promise(r => setTimeout(r, 600 * attempt));
+          continue;
+        }
+        workingModelName = null;
+        console.warn(`⚠️ Model ${modelName} attempt ${attempt} error (${msg}), trying next...`);
+        break;
+      }
     }
   }
   throw lastError || new Error('All Gemini models failed');
@@ -105,21 +114,41 @@ function parseJsonResponse(text) {
 export async function planTask(userCommand) {
   const prompt = `${PLANNER_SYSTEM_PROMPT}\n\n## User Task\n${userCommand}\n\nProduce the JSON plan:`;
 
-  const text = await callGeminiWithFallback(
-    {
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
-    },
-    prompt
-  );
-
   try {
-    const plan = parseJsonResponse(text);
-    return plan;
+    const text = await callGeminiWithFallback(
+      {
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
+      },
+      prompt
+    );
+    return parseJsonResponse(text);
   } catch (err) {
-    console.error('Failed to parse plan JSON:', text);
-    throw new Error(`AI returned invalid plan format: ${err.message}`);
+    console.warn(`AI Planning network fallback for "${userCommand}":`, err.message);
+    const lower = userCommand.toLowerCase();
+    if (lower.includes('weather')) {
+      const city = lower.replace(/.*weather(?:\s+in|\s+for)?/i, '').replace(/[?.!]/g, '').trim() || 'Tokyo';
+      return {
+        summary: `Check weather for ${city}`,
+        steps: [{
+          id: 1,
+          action: 'weather_query',
+          topic: city,
+          description: `Fetch real-time weather in ${city}`,
+        }],
+      };
+    }
+    // Universal research fallback
+    return {
+      summary: `Research: ${userCommand}`,
+      steps: [{
+        id: 1,
+        action: 'deep_research',
+        topic: userCommand,
+        description: `Autonomous search & extraction for "${userCommand}"`,
+      }],
+    };
   }
 }
 

@@ -17,6 +17,7 @@ import { parseDocument } from '../system/documentParser.js';
 import { getSystemInfo, getBatteryStatus } from '../system/systemInspector.js';
 import { executeWorkflow } from '../system/workflowEngine.js';
 import { performDeepResearch, researchAndSave } from '../ai/researcher.js';
+import { fetchWeather } from '../system/weatherService.js';
 
 /**
  * Execute a single action step.
@@ -260,6 +261,13 @@ const actionMap = {
    */
   deep_research: async (step) => {
     return await performDeepResearch(step.query || step.text || step.topic);
+  },
+
+  /**
+   * Real-Time Global Weather Query.
+   */
+  weather_query: async (step) => {
+    return await fetchWeather(step.topic || step.city || step.text);
   },
 
   /**
