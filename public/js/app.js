@@ -804,26 +804,76 @@ function setupEventListeners() {
 }
 
 async function captureClientScreenFrame() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return null;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    return { error: 'Your browser does not support the Screen Capture API.' };
+  }
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    await new Promise(r => {
-      video.onloadedmetadata = r;
-      setTimeout(r, 200);
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        displaySurface: 'monitor',
+        cursor: 'always',
+      },
+      audio: false,
     });
-    video.play();
+
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+
+    // Attach to DOM invisibly so Chrome GPU compositor renders frames reliably
+    video.style.position = 'fixed';
+    video.style.top = '-9999px';
+    video.style.left = '-9999px';
+    video.style.width = '1px';
+    video.style.height = '1px';
+    video.style.opacity = '0';
+    document.body.appendChild(video);
+
+    await video.play();
+
+    // Wait for at least 2 painted frames to avoid blank black first frame
+    await new Promise((resolve) => {
+      let count = 0;
+      if ('requestVideoFrameCallback' in video) {
+        const check = () => {
+          count++;
+          if (count >= 2) resolve();
+          else video.requestVideoFrameCallback(check);
+        };
+        video.requestVideoFrameCallback(check);
+      } else {
+        setTimeout(resolve, 500);
+      }
+    });
+
+    const width = video.videoWidth || 1920;
+    const height = video.videoHeight || 1080;
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, width, height);
+
+    // Clean up video element and stream tracks
     stream.getTracks().forEach(t => t.stop());
-    return canvas.toDataURL('image/jpeg', 0.85);
+    video.srcObject = null;
+    video.remove();
+
+    // Check if image is all black
+    const imgSample = ctx.getImageData(0, 0, Math.min(60, width), Math.min(60, height)).data;
+    let hasContent = false;
+    for (let i = 0; i < imgSample.length; i += 4) {
+      if (imgSample[i] > 20 || imgSample[i + 1] > 20 || imgSample[i + 2] > 20) {
+        hasContent = true;
+        break;
+      }
+    }
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    return { dataUrl, isBlank: !hasContent };
   } catch (err) {
-    console.warn('DisplayMedia capture cancelled or unavailable:', err);
-    return null;
+    return { error: err.name === 'NotAllowedError' ? 'Screen share permission was cancelled.' : err.message };
   }
 }
 
@@ -842,8 +892,19 @@ async function sendCommand() {
 
   let clientScreenshot = null;
   if (isScreenInspect) {
-    renderStatusMessage('📸 Capturing screen display...', 'running');
-    clientScreenshot = await captureClientScreenFrame();
+    renderStatusMessage('📸 Please choose "Entire Screen" in the browser prompt...', 'running');
+    const cap = await captureClientScreenFrame();
+    if (cap?.error) {
+      removeStatusMessage();
+      addAgentMessage(`⚠️ **Screen Vision Notice:** ${cap.error}\n\n*Tip: When asking Pilot to inspect your screen, please select **Entire Screen** in the browser popup so Pilot can perceive your active applications.*`);
+      return;
+    }
+    if (cap?.isBlank) {
+      removeStatusMessage();
+      addAgentMessage(`⚠️ **Screen Vision Notice:** The captured screen frame was blank or locked. Please ensure your screen is unlocked and select **Entire Screen** when prompted.`);
+      return;
+    }
+    clientScreenshot = cap?.dataUrl || null;
   }
 
   send({ type: 'command', text, clientScreenshot });

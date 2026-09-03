@@ -92,6 +92,21 @@ export async function inspectScreen(prompt = 'What is currently displayed on thi
     };
   }
 
+  // Guard against blank/black frames (e.g. background DWM isolation or unrendered video buffers)
+  if (cap.buffer && cap.buffer.length > 0) {
+    let nonZero = 0;
+    const limit = Math.min(cap.buffer.length, 3000);
+    for (let i = 80; i < limit; i++) {
+      if (cap.buffer[i] > 15) nonZero++;
+    }
+    if (nonZero < 30) {
+      return {
+        success: false,
+        error: 'The captured screen image appeared completely black or blank. Please make sure to select "Entire Screen" when prompted by your browser at http://localhost:3000.',
+      };
+    }
+  }
+
   try {
     const { generateContent } = await import('../ai/gemini.js');
     const windowsContext = (cap.activeWindows && cap.activeWindows.length > 0)
